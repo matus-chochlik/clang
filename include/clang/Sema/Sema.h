@@ -34,6 +34,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TemplateKinds.h"
 #include "clang/Basic/TypeTraits.h"
+#include "clang/Basic/Metaobjects.h"
 #include "clang/Sema/AnalysisBasedWarnings.h"
 #include "clang/Sema/CleanupInfo.h"
 #include "clang/Sema/DeclSpec.h"
@@ -1500,6 +1501,8 @@ public:
   /// context, such as when building a type for decltype(auto).
   QualType BuildDecltypeType(Expr *E, SourceLocation Loc,
                              bool AsUnevaluated = true);
+  QualType BuildUnrefltypeType(Expr *E, SourceLocation Loc,
+                               bool AsUnevaluated = true);
   QualType BuildUnaryTransformType(QualType BaseType,
                                    UnaryTransformType::UTTKind UKind,
                                    SourceLocation Loc);
@@ -3920,6 +3923,50 @@ public:
                                   UnaryExprOrTypeTrait ExprKind,
                                   bool IsType, void *TyOrEx,
                                   SourceRange ArgRange);
+
+  ExprResult GetReflexprGSExpr(SourceLocation opLoc, SourceRange argRange);
+  ExprResult GetReflexprSpecExpr(tok::TokenKind SpecTok,
+                                 SourceLocation opLoc, SourceRange argRange);
+  ExprResult GetReflexprNamedDeclExpr(const NamedDecl *nDecl,
+                                   SourceLocation opLoc, SourceRange argRange);
+  ExprResult GetReflexprTypeExpr(const TypeSourceInfo *TInfo, bool removeSugar,
+                                 SourceLocation opLoc, SourceRange argRange);
+
+  ExprResult OptionallyWrapReflexprExpr(bool idOnly, ExprResult E);
+
+  ExprResult ActOnReflexprGSExpr(bool idOnly,
+                                 SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprSpecExpr(bool idOnly, tok::TokenKind SpecTok,
+                                   SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprScopedExpr(bool idOnly, Scope *S, CXXScopeSpec& SS,
+                                    const IdentifierInfo& Ident,
+                                    SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprTypeExpr(bool idOnly, Scope *S, Declarator& D,
+                                   SourceLocation opLoc, SourceRange argRange);
+
+  ExprResult
+  CreateStrMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                            unsigned Arity, ExprResult* argExpr,
+                            SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateIntMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                            unsigned Arity, ExprResult* argExpr,
+                            SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                         unsigned Arity, ExprResult* argExpr,
+                         SourceLocation opLoc, SourceLocation endLoc);
+
+  ExprResult
+  ActOnMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                        unsigned Arity, ExprResult* argExpr,
+                        SourceLocation opLoc, SourceRange argRange);
+
+  ExprResult ActOnUnrefltypeExpression(Expr *E, SourceLocation opLoc);
+
+  bool ActOnCXXNestedNameSpecifierUnrefltype(CXXScopeSpec &SS,
+                                             const DeclSpec &DS,
+                                             SourceLocation ColonColonLoc);
 
   ExprResult CheckPlaceholderExpr(Expr *E);
   bool CheckVecStepExpr(Expr *E);

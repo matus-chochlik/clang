@@ -136,6 +136,11 @@ FLOATING_TYPE(LongDouble, LongDoubleTy)
 // '__float128'
 FLOATING_TYPE(Float128, Float128Ty)
 
+//===- Metaobject id type -------------------------------------------------===//
+
+// This is the type used to represent metaobjects
+UNSIGNED_TYPE(MetaobjectId, MetaobjectIdTy)
+
 //===- Language-specific types --------------------------------------------===//
 
 // This is the type of C++0x 'nullptr'.

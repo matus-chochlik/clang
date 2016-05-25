@@ -851,6 +851,19 @@ def err_type_trait_arity : Error<
   "type trait requires %0%select{| or more}1 argument%select{|s}2; have "
   "%3 argument%s3">;
 
+// Reflection
+def err_using_reflexpr_without_reflection : Error<
+  "'reflexpr' operator used without reflection support - compile with -freflection">;
+def err_using_unrefltype_without_reflection : Error<
+  "'unrefltype' operator used without reflection support - compile with -freflection">;
+def err_using_metaobject_id_without_reflection : Error<
+  "'__metaobject_id' type used without reflection support - compile with -freflection">;
+def err_using_metaobject_op_without_reflection : Error<
+  "metaobject operation '%0' used without reflection support - compile with -freflection">;
+def err_metaobject_op_arity : Error<
+  "Metaobject operation requires %0%select{| or more}1 argument%select{|s}2; "
+  "have %3 argument%s3">;
+
 // Language specific pragmas
 // - Generic warnings
 def warn_pragma_expected_lparen : Warning<

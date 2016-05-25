@@ -495,6 +495,9 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
     Builder.defineMacro("__cpp_experimental_concepts", "1");
   if (LangOpts.Coroutines)
     Builder.defineMacro("__cpp_coroutines", "1");
+
+  if (LangOpts.Reflection)
+    Builder.defineMacro("__cpp_reflection", "1");
 }
 
 static void InitializePredefinedMacros(const TargetInfo &TI,

@@ -61,6 +61,8 @@ bool FormatToken::isSimpleTypeSpecifier() const {
   case tok::kw_char32_t:
   case tok::kw_typeof:
   case tok::kw_decltype:
+  case tok::kw___metaobject_id:
+  case tok::kw___unrefltype:
     return true;
   default:
     return false;

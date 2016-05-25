@@ -90,6 +90,11 @@ def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
 
+// C++ reflection expressions / statements
+def ReflexprExpr : DStmt<Expr>;
+def MetaobjectIdExpr : DStmt<Expr>;
+def MetaobjectOpExpr : DStmt<Expr>;
+
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;
 

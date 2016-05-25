@@ -884,6 +884,89 @@ void Parser::AnnotateExistingDecltypeSpecifier(const DeclSpec& DS,
   PP.AnnotateCachedTokens(Tok);
 }
 
+SourceLocation Parser::ParseUnrefltypeSpecifier(DeclSpec &DS) {
+  assert(Tok.isOneOf(tok::kw___unrefltype, tok::annot___unrefltype)
+           && "Not a unrefltype specifier");
+
+  SourceLocation OpLoc = Tok.getLocation();
+  SourceLocation EndLoc;
+  ExprResult Result;
+
+  if (Tok.is(tok::annot___unrefltype)) {
+    Result = getExprAnnotation(Tok);
+    EndLoc = Tok.getAnnotationEndLoc();
+    ConsumeToken();
+    if (Result.isInvalid()) {
+      DS.SetTypeSpecError();
+      return EndLoc;
+    }
+  } else {
+    Token OpTok = Tok;
+    ConsumeToken(); // eat __unrefltype
+
+    BalancedDelimiterTracker Parens(*this, tok::l_paren);
+    if (Parens.expectAndConsume(diag::err_expected_lparen_after,
+                                OpTok.getName())) {
+      DS.SetTypeSpecError();
+      return OpLoc;
+    }
+
+    // The argument must be a __metaobject_id expression
+    Result = ParseCastExpression(false, false, NotTypeCast);
+
+    if (Result.isInvalid()) {
+      DS.SetTypeSpecError();
+      return Parens.getOpenLocation();
+    }
+
+    Result = Actions.ActOnUnrefltypeExpression(Result.get(), OpLoc);
+
+    if (Result.isInvalid()) {
+      DS.SetTypeSpecError();
+      return Parens.getOpenLocation();
+    }
+
+    Parens.consumeClose();
+    EndLoc = Parens.getCloseLocation();
+    if (EndLoc.isInvalid()) {
+      DS.SetTypeSpecError();
+      // FIXME: this should return the location of the last token
+      //        that was consumed (by "consumeClose()")
+      return EndLoc;
+    }
+  }
+  assert(!Result.isInvalid());
+
+  const char *PrevSpec = nullptr;
+  unsigned DiagID;
+  const PrintingPolicy &Policy = Actions.getASTContext().getPrintingPolicy();
+  if (DS.SetTypeSpecType(DeclSpec::TST_unrefltype, OpLoc, PrevSpec,
+                         DiagID, Result.get(), Policy)) {
+    Diag(OpLoc, DiagID) << PrevSpec;
+    DS.SetTypeSpecError();
+  }
+
+  return EndLoc;
+}
+
+void Parser::AnnotateExistingUnrefltypeSpecifier(const DeclSpec& DS, 
+                                                  SourceLocation StartLoc,
+                                                  SourceLocation EndLoc) {
+  // make sure we have a token we can turn into an annotation token
+  if (PP.isBacktrackEnabled())
+    PP.RevertCachedTokens(1);
+  else
+    PP.EnterToken(Tok);
+
+  Tok.setKind(tok::annot___unrefltype);
+  setExprAnnotation(Tok,
+                    DS.getTypeSpecType() == TST_unrefltype ? DS.getRepAsExpr() :
+                    ExprError());
+  Tok.setAnnotationEndLoc(EndLoc);
+  Tok.setLocation(StartLoc);
+  PP.AnnotateCachedTokens(Tok);
+}
+
 void Parser::ParseUnderlyingTypeSpecifier(DeclSpec &DS) {
   assert(Tok.is(tok::kw___underlying_type) &&
          "Not an underlying type specifier");
@@ -3283,7 +3366,7 @@ MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
   // Uses of decltype will already have been converted to annot_decltype by
   // ParseOptionalCXXScopeSpecifier at this point.
   if (!TemplateTypeTy && Tok.isNot(tok::identifier)
-      && Tok.isNot(tok::annot_decltype)) {
+      && Tok.isNot(tok::annot_decltype) && Tok.isNot(tok::annot___unrefltype)) {
     Diag(Tok, diag::err_expected_member_or_base_name);
     return true;
   }
@@ -3294,6 +3377,9 @@ MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
   if (Tok.is(tok::annot_decltype)) {
     // Get the decltype expression, if there is one.
     ParseDecltypeSpecifier(DS);
+  } else if (Tok.is(tok::annot___unrefltype)) {
+    // Get the __unrefltype expression, if there is one.
+    ParseUnrefltypeSpecifier(DS);
   } else {
     if (Tok.is(tok::identifier))
       // Get the identifier. This may be a member name or a class name,

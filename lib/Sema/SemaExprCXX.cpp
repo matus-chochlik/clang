@@ -4917,6 +4917,209 @@ QualType Sema::CheckPointerToMemberOperands(ExprResult &LHS, ExprResult &RHS,
   return Result;
 }
 
+ExprResult
+Sema::OptionallyWrapReflexprExpr(bool idOnly, ExprResult E) {
+  // TODO[reflexpr] wrap the expression into std::meta::__metaobject
+  // if not idOnly
+  if (!idOnly) {
+  }
+  return E;
+}
+
+ExprResult
+Sema::GetReflexprGSExpr(SourceLocation opLoc, SourceRange argRange) {
+  return ReflexprExpr::getGSReflexprExpr(Context, opLoc, argRange);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr([::]) expression
+ExprResult
+Sema::ActOnReflexprGSExpr(bool idOnly,
+                          SourceLocation opLoc, SourceRange argRange) {
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprGSExpr(opLoc, argRange));
+}
+
+ExprResult
+Sema::GetReflexprSpecExpr(tok::TokenKind specTok,
+                          SourceLocation opLoc, SourceRange argRange) {
+  return ReflexprExpr::getSpecifierReflexprExpr(Context, specTok,
+                                                opLoc, argRange);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr(specifier) expression
+ExprResult
+Sema::ActOnReflexprSpecExpr(bool idOnly, tok::TokenKind specTok,
+                            SourceLocation opLoc, SourceRange argRange) {
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprSpecExpr(specTok, opLoc, argRange));
+}
+
+ExprResult
+Sema::GetReflexprNamedDeclExpr(const NamedDecl* nDecl,
+                               SourceLocation opLoc, SourceRange argRange) {
+  return ReflexprExpr::getNamedDeclReflexprExpr(Context, nDecl,
+                                                opLoc, argRange);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr(name) expression
+ExprResult
+Sema::ActOnReflexprScopedExpr(bool idOnly, Scope* S, CXXScopeSpec& SS,
+                              const IdentifierInfo& Ident,
+                              SourceLocation opLoc, SourceRange argRange) {
+  LookupResult R(*this, &Ident, argRange.getBegin(), LookupOrdinaryName);
+  LookupParsedName(R, S, &SS);
+
+  if (!R.empty() && !R.isAmbiguous()) {
+    if (const NamedDecl* nDecl = R.getFoundDecl()) {
+      return OptionallyWrapReflexprExpr(idOnly,
+               GetReflexprNamedDeclExpr(nDecl, opLoc, argRange));
+    }
+  }
+  return ExprError();
+}
+
+ExprResult
+Sema::GetReflexprTypeExpr(const TypeSourceInfo *TInfo, bool removeSugar,
+                          SourceLocation opLoc, SourceRange argRange) {
+  return ReflexprExpr::getTypeReflexprExpr(Context, TInfo, removeSugar,
+		                           opLoc, argRange);
+}
+
+ExprResult
+Sema::ActOnReflexprTypeExpr(bool idOnly, Scope *S, Declarator &D,
+                                 SourceLocation opLoc, SourceRange argRange) {
+  assert(D.getIdentifier() == nullptr &&
+         "Type name should have no identifier!");
+
+  TypeSourceInfo *TInfo = GetTypeForDeclarator(D, S);
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprTypeExpr(TInfo, false, opLoc, argRange));
+}
+
+ExprResult
+Sema::CreateIntMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                                unsigned Arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc) {
+  assert((OpRes != MOOR_String) &&
+         "Cannot handle a string-returning operation here");
+  assert((Arity > 0) &&
+         "Metaobject operation arity must be greater than zero");
+  assert((Arity <= MetaobjectOpExpr::MaxArity) &&
+         "Maximum metaobject operation arity exceeded");
+  assert(argExpr[0].isUsable());
+
+  // TODO[reflexpr] check if the arg exprs are valid and yield metaobject ids
+
+  if(Arity > 1) {
+    assert(argExpr[1].isUsable());
+  }
+
+  Expr* ArgExpr[MetaobjectOpExpr::MaxArity];
+  for(unsigned i=0; i<Arity; ++i) {
+    ArgExpr[i] = argExpr[i].get();
+  }
+
+  QualType resType = MetaobjectOpExpr::getResultKindType(Context, OpRes);
+  return new (Context) MetaobjectOpExpr(Oper, OpRes, resType,
+                                        Arity, ArgExpr, opLoc, endLoc);
+}
+
+ExprResult
+Sema::CreateStrMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                                unsigned Arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc) {
+  assert((OpRes == MOOR_String) &&
+         "Cannot handle a non-string-returning operation here");
+  assert((Arity > 0) &&
+         "Metaobject operation arity must be greater than zero");
+  assert((Arity < MetaobjectOpExpr::MaxArity) &&
+         "Maximum metaobject operation arity exceeded");
+  assert(argExpr[0].isUsable());
+
+  bool isDep = false;
+  Expr* ArgExpr[MetaobjectOpExpr::MaxArity];
+  // TODO[reflexpr] check if the arg exprs are valid and yield metaobject ids
+  for(unsigned i=0; i<Arity; ++i) {
+    ArgExpr[i] = argExpr[i].get();
+    isDep |= ArgExpr[i]->isTypeDependent();
+    isDep |= ArgExpr[i]->isValueDependent();
+    isDep |= ArgExpr[i]->isInstantiationDependent();
+  }
+
+  if(isDep) {
+    return new (Context) MetaobjectOpExpr(Oper, OpRes, Context.VoidTy,
+                                          Arity, ArgExpr, opLoc, endLoc);
+  } else {
+    std::string Value = MetaobjectOpExpr::getStrResult(Context, Oper,
+                                                       Arity, ArgExpr);
+    QualType CharTyConst = Context.CharTy;
+    CharTyConst.addConst();
+
+    QualType StrTy = Context.getConstantArrayType(CharTyConst,
+                                   llvm::APInt(32, Value.size()+1),
+                                   ArrayType::Normal, 0);
+
+    return StringLiteral::Create(Context, Value, StringLiteral::UTF8,
+                                 false/*pascal*/, StrTy, &opLoc, 1);
+  }
+}
+
+ExprResult
+Sema::CreateMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                             unsigned Arity, ExprResult* argExpr,
+                             SourceLocation opLoc, SourceLocation endLoc) {
+
+  Expr* moE = argExpr[0].get();
+  if (!moE->isInstantiationDependent()) {
+    uintptr_t moid;
+
+    if (!MetaobjectOpExpr::queryExprMetaobjectId(Context, moid, moE)){
+      Diag(opLoc, diag::err_expected_metaobject_id_expr);
+      return ExprError();
+    }
+    if (!MetaobjectOpExpr::isOperationApplicable(Context, moid, Oper)) {
+      Diag(opLoc, diag::err_metaobject_operation_not_applicable)
+        << MetaobjectOpExpr::getOperationSpelling(Oper)
+        << ReflexprExpr::getMetaobjectKindName(Context, moid);
+
+      return ExprError();
+    }
+  }
+
+  if (OpRes == MOOR_String) {
+    return CreateStrMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                     opLoc, endLoc);
+  } else {
+    return CreateIntMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                     opLoc, endLoc);
+  }
+}
+
+ExprResult
+Sema::ActOnMetaobjectOpExpr(MetaobjectOp Oper, MetaobjectOpResult OpRes,
+                            unsigned Arity, ExprResult* argExpr,
+                            SourceLocation opLoc, SourceRange argRange) {
+  return CreateMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                opLoc, argRange.getEnd());
+}
+
+ExprResult Sema::ActOnUnrefltypeExpression(Expr *E, SourceLocation opLoc) {
+
+  if (!E->isInstantiationDependent()) {
+    if (const auto *RE = ReflexprExpr::fromExpr(Context, E)) {
+      if (!RE->reflectsType()) {
+        Diag(opLoc, diag::err_unrefltype_operator_not_applicable)
+          << RE->getMetaobjectKindName(RE->getKind());
+        return ExprError();
+      }
+    } else {
+      Diag(opLoc, diag::err_expected_metaobject_id_expr);
+      return ExprError();
+    }
+  }
+  return E;
+}
+
 /// \brief Try to convert a type to another according to C++11 5.16p3.
 ///
 /// This is part of the parameter validation for the ? operator. If either
