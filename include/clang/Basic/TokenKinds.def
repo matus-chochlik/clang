@@ -45,6 +45,24 @@
 #ifndef TYPE_TRAIT_N
 #define TYPE_TRAIT_N(I,E,K) TYPE_TRAIT(0,I,K)
 #endif
+#ifndef METAOBJECT_OP
+#define METAOBJECT_OP(A,S,R,N,K) KEYWORD(__metaobject_ ## S,K)
+#endif
+#ifndef METAOBJECT_OP_2
+#define METAOBJECT_OP_2(S,R,N,K) METAOBJECT_OP(2,S,R,N,K)
+#endif
+#ifndef METAOBJECT_OP_1
+#define METAOBJECT_OP_1(S,R,N,K) METAOBJECT_OP(1,S,R,N,K)
+#endif
+#ifndef METAOBJECT_INT_OP_1
+#define METAOBJECT_INT_OP_1(S,R,N,K) METAOBJECT_OP_1(S,R,N,K)
+#endif
+#ifndef METAOBJECT_STR_OP_1
+#define METAOBJECT_STR_OP_1(S,R,N,K) METAOBJECT_OP_1(S,R,N,K)
+#endif
+#ifndef METAOBJECT_TRAIT
+#define METAOBJECT_TRAIT(S,C,K) METAOBJECT_OP_1(is_meta_##S,Bool,IsMeta##C,K)
+#endif
 #ifndef ALIAS
 #define ALIAS(X,Y,Z)
 #endif
@@ -252,6 +270,8 @@ PUNCTUATOR(caretcaret,            "^^")
 //   KEYBORLAND - This is a keyword if Borland extensions are enabled
 //   KEYCOROUTINES - This is a keyword if support for the C++ coroutines
 //                   TS is enabled
+//   KEYREFLECTION - This is a keyword if support for the C++ reflection
+//                   TS is enabled
 //   BOOLSUPPORT - This is a keyword if 'bool' is a built-in type
 //   HALFSUPPORT - This is a keyword if 'half' is a built-in type
 //   WCHARSUPPORT - This is a keyword if 'wchar_t' is a built-in type
@@ -374,6 +394,100 @@ KEYWORD(co_yield                    , KEYCOROUTINES)
 // C++ modules TS keywords
 MODULES_KEYWORD(module)
 MODULES_KEYWORD(import)
+
+// C++ reflection keywords
+KEYWORD(reflexpr                    , KEYREFLECTION)
+KEYWORD(__reflexpr                  , KEYREFLECTION)
+KEYWORD(__unrefltype                , KEYREFLECTION)
+KEYWORD(__metaobject_id             , KEYREFLECTION)
+
+// Reflection metaobject operation buildins
+// Categorization
+METAOBJECT_TRAIT(obj_sequence  , ObjectSequence  , KEYREFLECTION)
+METAOBJECT_TRAIT(reversible    , Reversible      , KEYREFLECTION)
+METAOBJECT_TRAIT(named         , Named           , KEYREFLECTION)
+METAOBJECT_TRAIT(typed         , Typed           , KEYREFLECTION)
+METAOBJECT_TRAIT(scope         , Scope           , KEYREFLECTION)
+METAOBJECT_TRAIT(scope_member  , ScopeMember     , KEYREFLECTION)
+METAOBJECT_TRAIT(inheritance   , Inheritance     , KEYREFLECTION)
+METAOBJECT_TRAIT(enum_member   , EnumMember      , KEYREFLECTION)
+METAOBJECT_TRAIT(record_member , RecordMember    , KEYREFLECTION)
+METAOBJECT_TRAIT(alias         , Alias           , KEYREFLECTION)
+METAOBJECT_TRAIT(constant      , Constant        , KEYREFLECTION)
+METAOBJECT_TRAIT(variable      , Variable        , KEYREFLECTION)
+METAOBJECT_TRAIT(namespace     , Namespace       , KEYREFLECTION)
+METAOBJECT_TRAIT(global_scope  , GlobalScope     , KEYREFLECTION)
+METAOBJECT_TRAIT(type          , Type            , KEYREFLECTION)
+METAOBJECT_TRAIT(tag_type      , TagType         , KEYREFLECTION)
+METAOBJECT_TRAIT(enum          , Enum            , KEYREFLECTION)
+METAOBJECT_TRAIT(record        , Record          , KEYREFLECTION)
+METAOBJECT_TRAIT(class         , Class           , KEYREFLECTION)
+METAOBJECT_TRAIT(specifier     , Specifier       , KEYREFLECTION)
+//
+// Operations
+METAOBJECT_INT_OP_1(get_id_value         , ULong        ,
+                    GetIdValue           , KEYREFLECTION)
+METAOBJECT_STR_OP_1(get_source_file      , String       ,
+                    GetSourceFile        , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_source_line      , UInt         ,
+                    GetSourceLine        , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_source_column    , UInt         ,
+                    GetSourceColumn      , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_anonymous         , Bool         ,
+                    IsAnonymous          , KEYREFLECTION)
+METAOBJECT_STR_OP_1(get_name             , String       ,
+                    GetName              , KEYREFLECTION)
+METAOBJECT_STR_OP_1(get_display_name     , String       ,
+                    GetDisplayName       , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_scoped            , Bool         ,
+                    IsScoped             , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_scope            , Metaobj      ,
+                    GetScope             , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_type             , Metaobj      ,
+                    GetType              , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_tag_specifier    , Metaobj      ,
+                    GetTagSpecifier      , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_enum              , Bool         ,
+                    IsEnum               , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_class             , Bool         ,
+                    IsClass              , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_struct            , Bool         ,
+                    IsStruct             , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_union             , Bool         ,
+                    IsUnion              , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_base_classes     , Metaobj      ,
+                    GetBaseClasses       , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_member_types     , Metaobj      ,
+                    GetMemberTypes       , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_member_variables , Metaobj      ,
+                    GetMemberVariables   , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_member_constants , Metaobj      ,
+                    GetMemberConstants   , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_base_class       , Metaobj      ,
+                    GetBaseClass         , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_access_specifier , Metaobj      ,
+                    GetAccessSpecifier   , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_public            , Bool         ,
+                    IsPublic             , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_protected         , Bool         ,
+                    IsProtected          , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_private           , Bool         ,
+                    IsPrivate            , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_static            , Bool         ,
+                    IsStatic             , KEYREFLECTION)
+METAOBJECT_INT_OP_1(is_virtual           , Bool         ,
+                    IsVirtual            , KEYREFLECTION)
+METAOBJECT_INT_OP_1(expose_protected     , Metaobj      ,
+                    ExposeProtected      , KEYREFLECTION)
+METAOBJECT_INT_OP_1(expose_private       , Metaobj      ,
+                    ExposePrivate        , KEYREFLECTION)
+METAOBJECT_INT_OP_1(get_size             , UInt         ,
+                    GetSize              , KEYREFLECTION)
+
+METAOBJECT_OP_2(get_element          , Metaobj      ,
+                GetElement           , KEYREFLECTION)
+METAOBJECT_OP_2(reflects_same        , Bool         ,
+                ReflectsSame         , KEYREFLECTION)
 
 // GNU Extensions (in impl-reserved namespace)
 KEYWORD(_Decimal32                  , KEYALL)
@@ -694,6 +808,8 @@ ANNOTATION(template_id)  // annotation for a C++ template-id that names a
 ANNOTATION(primary_expr) // annotation for a primary expression
 ANNOTATION(decltype)     // annotation for a decltype expression,
                          // e.g., "decltype(foo.bar())"
+ANNOTATION(__unrefltype) // annotation for a __unrefltype expression,
+                         // e.g., "__unrefltype(__reflexpr(int))"
 
 // Annotation for #pragma unused(...)
 // For each argument inside the parentheses the pragma handler will produce
@@ -798,6 +914,12 @@ ANNOTATION(module_end)
 #undef CXX_KEYWORD_OPERATOR
 #undef PPKEYWORD
 #undef ALIAS
+#undef METAOBJECT_TRAIT
+#undef METAOBJECT_STR_OP_1
+#undef METAOBJECT_INT_OP_1
+#undef METAOBJECT_OP_1
+#undef METAOBJECT_OP_2
+#undef METAOBJECT_OP
 #undef TYPE_TRAIT_N
 #undef TYPE_TRAIT_2
 #undef TYPE_TRAIT_1

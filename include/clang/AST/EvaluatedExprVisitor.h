@@ -41,6 +41,9 @@ public:
   void VisitDeclRefExpr(PTR(DeclRefExpr) E) { }
   void VisitOffsetOfExpr(PTR(OffsetOfExpr) E) { }
   void VisitUnaryExprOrTypeTraitExpr(PTR(UnaryExprOrTypeTraitExpr) E) { }
+  void VisitReflexprExpr(PTR(ReflexprExpr) E) { }
+  void VisitMetaobjectIdExpr(PTR(MetaobjectIdExpr) E) { }
+  void VisitMetaobjectOpExpr(PTR(MetaobjectOpExpr) E) { }
   void VisitExpressionTraitExpr(PTR(ExpressionTraitExpr) E) { }
   void VisitBlockExpr(PTR(BlockExpr) E) { }
   void VisitCXXUuidofExpr(PTR(CXXUuidofExpr) E) { }

@@ -731,8 +731,11 @@ ASTContext::ASTContext(LangOptions &LOpts, SourceManager &SM,
     : FunctionProtoTypes(this_()), TemplateSpecializationTypes(this_()),
       DependentTemplateSpecializationTypes(this_()),
       SubstTemplateTemplateParmPacks(this_()),
-      GlobalNestedNameSpecifier(nullptr), Int128Decl(nullptr),
-      UInt128Decl(nullptr), BuiltinVaListDecl(nullptr),
+      GlobalNestedNameSpecifier(nullptr),
+      MetaobjectEncodingKey(makeMetaobjectKey()),
+      GlobalScopeReflexpr(nullptr), NoSpecifierReflexpr(nullptr),
+      SpecifierReflexprs(10),
+      Int128Decl(nullptr), UInt128Decl(nullptr), BuiltinVaListDecl(nullptr),
       BuiltinMSVaListDecl(nullptr), ObjCIdDecl(nullptr), ObjCSelDecl(nullptr),
       ObjCClassDecl(nullptr), ObjCProtocolClassDecl(nullptr), BOOLDecl(nullptr),
       CFConstantStringTagDecl(nullptr), CFConstantStringTypeDecl(nullptr),
@@ -741,7 +744,7 @@ ASTContext::ASTContext(LangOptions &LOpts, SourceManager &SM,
       BlockDescriptorType(nullptr), BlockDescriptorExtendedType(nullptr),
       cudaConfigureCallDecl(nullptr), FirstLocalImport(), LastLocalImport(),
       ExternCContext(nullptr), MakeIntegerSeqDecl(nullptr),
-      TypePackElementDecl(nullptr), SourceMgr(SM), LangOpts(LOpts),
+      TypePackElementDecl(nullptr), UnpackMetaobjectSeqDecl(nullptr), SourceMgr(SM), LangOpts(LOpts),
       SanitizerBL(new SanitizerBlacklist(LangOpts.SanitizerBlacklistFiles, SM)),
       AddrSpaceMap(nullptr), Target(nullptr), AuxTarget(nullptr),
       PrintingPolicy(LOpts), Idents(idents), Selectors(sels),
@@ -998,6 +1001,14 @@ ASTContext::getTypePackElementDecl() const {
   return TypePackElementDecl;
 }
 
+BuiltinTemplateDecl *
+ASTContext::getUnpackMetaobjectSeqDecl() const {
+  if (!UnpackMetaobjectSeqDecl)
+    UnpackMetaobjectSeqDecl = buildBuiltinTemplateDecl(BTK__unpack_metaobject_seq,
+                                                       getTypePackElementName());
+  return UnpackMetaobjectSeqDecl;
+}
+
 RecordDecl *ASTContext::buildImplicitRecord(StringRef Name,
                                             RecordDecl::TagKind TK) const {
   SourceLocation Loc;
@@ -1114,6 +1125,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
     InitBuiltinType(Char32Ty,           BuiltinType::Char32);
   else // C99
     Char32Ty = getFromTargetType(Target.getChar32Type());
+
+
+  // reflection metaobject id type
+  InitBuiltinType(MetaobjectIdTy,      BuiltinType::MetaobjectId);
 
   // Placeholder type for type-dependent expressions whose type is
   // completely unknown. No code should ever check a type against
@@ -1392,6 +1407,69 @@ void ASTContext::addedLocalImportDecl(ImportDecl *Import) {
   
   LastLocalImport->NextLocalImport = Import;
   LastLocalImport = Import;
+}
+//===----------------------------------------------------------------------===//
+//                                Reflection
+//===----------------------------------------------------------------------===//
+uintptr_t ASTContext::makeMetaobjectKey() const {
+  std::random_device rd;
+  std::mt19937 re(rd());
+  std::independent_bits_engine<
+    std::mt19937, sizeof(uintptr_t)*CHAR_BIT, uintptr_t> ibe(re);
+
+  uintptr_t key = ibe();
+  // TODO[reflexpr] random_device can repeat itself, do we need to throw some
+  // more entropy here?
+  return key;
+}
+
+uintptr_t ASTContext::encodeMetaobjectId(uintptr_t unencoded) {
+  return unencoded ^ MetaobjectEncodingKey;
+}
+
+uintptr_t ASTContext::decodeMetaobjectId(uintptr_t encoded) {
+  return encoded ^ MetaobjectEncodingKey;
+}
+
+ReflexprExpr*
+ASTContext::cacheGlobalScopeReflexpr(ReflexprExpr* E) {
+  assert(!GlobalScopeReflexpr);
+  // TODO[reflexpr] this must be reset everytime a new declaration is
+  // added to the global scope. Otherwise member iteration won't work
+  return GlobalScopeReflexpr = E;
+}
+
+ReflexprExpr*
+ASTContext::cacheSpecifierReflexpr(tok::TokenKind K, ReflexprExpr* E) {
+  std::pair<unsigned, ReflexprExpr*> P(static_cast<unsigned>(K), E);
+  bool firstOneInserted = SpecifierReflexprs.insert(P).second;
+  assert(firstOneInserted);
+  return E;
+}
+
+ReflexprExpr*
+ASTContext::findSpecifierReflexpr(tok::TokenKind K) const {
+  SpecifierReflexprMap::const_iterator p =
+    SpecifierReflexprs.find(static_cast<unsigned>(K));
+  if(p != SpecifierReflexprs.end())
+    return p->second;
+  return nullptr;
+}
+
+ReflexprExpr*
+ASTContext::cacheNamedDeclReflexpr(const NamedDecl* ND, ReflexprExpr* E) {
+  std::pair<const NamedDecl*, ReflexprExpr*> P(ND, E);
+  bool firstOneInserted = NamedDeclReflexprs.insert(P).second;
+  assert(firstOneInserted);
+  return E;
+}
+
+ReflexprExpr*
+ASTContext::findNamedDeclReflexpr(const NamedDecl* ND) const {
+  NamedDeclReflexprMap::const_iterator p = NamedDeclReflexprs.find(ND);
+  if(p != NamedDeclReflexprs.end())
+    return p->second;
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1693,6 +1771,10 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     case BuiltinType::Long:
       Width = Target->getLongWidth();
       Align = Target->getLongAlign();
+      break;
+    case BuiltinType::MetaobjectId:
+      Width = Target->getPointerWidth(0);
+      Align = Target->getPointerAlign(0);
       break;
     case BuiltinType::ULongLong:
     case BuiltinType::LongLong:
@@ -2710,6 +2792,7 @@ QualType ASTContext::getVariableArrayDecayedType(QualType type) const {
   case Type::TypeOfExpr:
   case Type::TypeOf:
   case Type::Decltype:
+  case Type::Unrefltype:
   case Type::UnaryTransform:
   case Type::DependentName:
   case Type::InjectedClassName:
@@ -4061,6 +4144,31 @@ QualType ASTContext::getDecltypeType(Expr *e, QualType UnderlyingType) const {
   return QualType(dt, 0);
 }
 
+QualType ASTContext::getUnrefltypeType(Expr *e, QualType UnderlyingType) const {
+  UnrefltypeType *dt;
+
+  if (e->isInstantiationDependent()) {
+    llvm::FoldingSetNodeID ID;
+    DependentUnrefltypeType::Profile(ID, *this, e);
+
+    void *InsertPos = nullptr;
+    DependentUnrefltypeType *Canon
+      = DependentUnrefltypeTypes.FindNodeOrInsertPos(ID, InsertPos);
+    if (!Canon) {
+      // Build a new, canonical typeof(expr) type.
+      Canon = new (*this, TypeAlignment) DependentUnrefltypeType(*this, e);
+      DependentUnrefltypeTypes.InsertNode(Canon, InsertPos);
+    }
+    dt = new (*this, TypeAlignment)
+        UnrefltypeType(e, UnderlyingType, QualType((UnrefltypeType *)Canon, 0));
+  } else {
+    dt = new (*this, TypeAlignment)
+        UnrefltypeType(e, UnderlyingType, getCanonicalType(UnderlyingType));
+  }
+  Types.push_back(dt);
+  return QualType(dt, 0);
+}
+
 /// getUnaryTransformationType - We don't unique these, since the memory
 /// savings are minimal and these are rare.
 QualType ASTContext::getUnaryTransformType(QualType BaseType,
@@ -4175,6 +4283,12 @@ QualType ASTContext::getTagDeclType(const TagDecl *Decl) const {
   // FIXME: What is the design on getTagDeclType when it requires casting
   // away const?  mutable?
   return getTypeDeclType(const_cast<TagDecl*>(Decl));
+}
+
+/// getMetaobjectIdType - Return the unique type for "size_t"
+/// the result of the __reflexpr operator 
+CanQualType ASTContext::getMetaobjectIdType() const {
+  return MetaobjectIdTy;
 }
 
 /// getSizeType - Return the unique type for "size_t" (C99 7.17), the result
@@ -4768,6 +4882,8 @@ unsigned ASTContext::getIntegerRank(const Type *T) const {
   case BuiltinType::Int:
   case BuiltinType::UInt:
     return 4 + (getIntWidth(IntTy) << 3);
+  case BuiltinType::MetaobjectId:
+    return 4 + (getIntWidth(getUIntPtrType()) << 3);
   case BuiltinType::Long:
   case BuiltinType::ULong:
     return 5 + (getIntWidth(LongTy) << 3);
@@ -5561,6 +5677,8 @@ static char getObjCEncodingForPrimitiveKind(const ASTContext *C,
     case BuiltinType::UInt:       return 'I';
     case BuiltinType::ULong:
         return C->getTargetInfo().getLongWidth() == 32 ? 'L' : 'Q';
+    case BuiltinType::MetaobjectId:
+        return C->getTargetInfo().getPointerWidth(0) == 32 ? 'L' : 'Q';
     case BuiltinType::UInt128:    return 'T';
     case BuiltinType::ULongLong:  return 'Q';
     case BuiltinType::Char_S:

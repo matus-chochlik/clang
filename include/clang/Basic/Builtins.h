@@ -222,7 +222,10 @@ enum BuiltinTemplateKind : int {
   BTK__make_integer_seq,
 
   /// \brief This names the __type_pack_element BuiltinTemplateDecl.
-  BTK__type_pack_element
+  BTK__type_pack_element,
+
+  /// \brief This names the __unpack_metaobject_seq BuiltinTemplateDecl.
+  BTK__unpack_metaobject_seq
 };
 
 } // end namespace clang

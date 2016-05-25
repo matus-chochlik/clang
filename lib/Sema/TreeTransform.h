@@ -854,6 +854,12 @@ public:
   /// Subclasses may override this routine to provide different behavior.
   QualType RebuildDecltypeType(Expr *Underlying, SourceLocation Loc);
 
+  /// \brief Build a new Reflection unrefltype type.
+  ///
+  /// By default, performs semantic analysis when building the unrefltype type.
+  /// Subclasses may override this routine to provide different behavior.
+  QualType RebuildUnrefltypeType(Expr *Underlying, SourceLocation Loc);
+
   /// \brief Build a new C++11 auto type.
   ///
   /// By default, builds a new AutoType with the given deduced type.
@@ -2062,6 +2068,13 @@ public:
       return ExprError();
 
     return Result;
+  }
+
+  ExprResult RebuildMetaobjectOpExpr(MetaobjectOp Oper,MetaobjectOpResult OpRes,
+                                     unsigned arity, ExprResult* argExpr,
+                                     SourceLocation opLoc,SourceLocation rpLoc){
+    return getSema().CreateMetaobjectOpExpr(Oper, OpRes, arity, argExpr,
+                                         opLoc, rpLoc);
   }
 
   /// \brief Build a new array subscript expression.
@@ -5273,6 +5286,34 @@ QualType TreeTransform<Derived>::TransformDecltypeType(TypeLocBuilder &TLB,
   else E.get();
 
   DecltypeTypeLoc NewTL = TLB.push<DecltypeTypeLoc>(Result);
+  NewTL.setNameLoc(TL.getNameLoc());
+
+  return Result;
+}
+
+template<typename Derived>
+QualType TreeTransform<Derived>::TransformUnrefltypeType(TypeLocBuilder &TLB,
+                                                         UnrefltypeTypeLoc TL) {
+  const UnrefltypeType *T = TL.getTypePtr();
+
+  ExprResult E = getDerived().TransformExpr(T->getUnderlyingExpr());
+  if (E.isInvalid())
+    return QualType();
+
+  E = getSema().ActOnUnrefltypeExpression(E.get(), TL.getNameLoc());
+  if (E.isInvalid())
+    return QualType();
+
+  QualType Result = TL.getType();
+  if (getDerived().AlwaysRebuild() ||
+      E.get() != T->getUnderlyingExpr()) {
+    Result = getDerived().RebuildUnrefltypeType(E.get(), TL.getNameLoc());
+    if (Result.isNull())
+      return QualType();
+  }
+  else E.get();
+
+  UnrefltypeTypeLoc NewTL = TLB.push<UnrefltypeTypeLoc>(Result);
   NewTL.setNameLoc(TL.getNameLoc());
 
   return Result;
@@ -8517,6 +8558,44 @@ TreeTransform<Derived>::TransformUnaryExprOrTypeTraitExpr(
 
 template<typename Derived>
 ExprResult
+TreeTransform<Derived>::TransformReflexprExpr(ReflexprExpr *E) {
+  if (!E->isTypeDependent())
+    return E;
+  // TODO[reflexpr]
+  return ExprError();
+}
+
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformMetaobjectOpExpr(MetaobjectOpExpr *E) {
+  ExprResult ArgExpr[MetaobjectOpExpr::MaxArity];
+
+  unsigned Arity = E->getArity();
+  for(unsigned i=0; i<Arity; ++i)
+    ArgExpr[i] = getDerived().TransformExpr(E->getArgumentExpr(i));
+
+  bool doRebuild = getDerived().AlwaysRebuild();
+  for(unsigned i=0; i<Arity && !doRebuild; ++i)
+    doRebuild |= ArgExpr[i].get() != E->getArgumentExpr(i);
+
+  if(!doRebuild)
+    return E;
+
+  return getDerived().RebuildMetaobjectOpExpr(E->getKind(),
+                                              E->getResultKind(),
+                                              Arity, ArgExpr,
+                                              E->getOperatorLoc(),
+                                              E->getRParenLoc());
+}
+
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformMetaobjectIdExpr(MetaobjectIdExpr *E) {
+  return E;
+}
+
+template<typename Derived>
+ExprResult
 TreeTransform<Derived>::TransformArraySubscriptExpr(ArraySubscriptExpr *E) {
   ExprResult LHS = getDerived().TransformExpr(E->getLHS());
   if (LHS.isInvalid())
@@ -11678,6 +11757,12 @@ template<typename Derived>
 QualType TreeTransform<Derived>::RebuildDecltypeType(Expr *E,
                                                      SourceLocation Loc) {
   return SemaRef.BuildDecltypeType(E, Loc);
+}
+
+template<typename Derived>
+QualType TreeTransform<Derived>::RebuildUnrefltypeType(Expr *E,
+                                                     SourceLocation Loc) {
+  return SemaRef.BuildUnrefltypeType(E, Loc);
 }
 
 template<typename Derived>

@@ -435,6 +435,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
     case BuiltinType::WChar_U:
     case BuiltinType::Char16:
     case BuiltinType::Char32:
+    case BuiltinType::MetaobjectId:
       ResultType = llvm::IntegerType::get(getLLVMContext(),
                                  static_cast<unsigned>(Context.getTypeSize(T)));
       break;

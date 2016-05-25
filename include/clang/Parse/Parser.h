@@ -2282,6 +2282,10 @@ private:
   void AnnotateExistingDecltypeSpecifier(const DeclSpec &DS,
                                          SourceLocation StartLoc,
                                          SourceLocation EndLoc);
+  SourceLocation ParseUnrefltypeSpecifier(DeclSpec &DS);
+  void AnnotateExistingUnrefltypeSpecifier(const DeclSpec &DS,
+                                           SourceLocation StartLoc,
+                                           SourceLocation EndLoc);
   void ParseUnderlyingTypeSpecifier(DeclSpec &DS);
   void ParseAtomicSpecifier(DeclSpec &DS);
 
@@ -2668,6 +2672,11 @@ private:
   //===--------------------------------------------------------------------===//
   // C++11/G++: Type Traits [Type-Traits.html in the GCC manual]
   ExprResult ParseTypeTrait();
+
+  //===--------------------------------------------------------------------===//
+  // C++ reflection: Metaobject operations
+  ExprResult ParseReflexprExpression(bool idOnly);
+  ExprResult ParseMetaobjectOperation();
   
   //===--------------------------------------------------------------------===//
   // Embarcadero: Arary and Expression Traits

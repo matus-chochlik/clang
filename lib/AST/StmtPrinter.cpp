@@ -1361,6 +1361,7 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
   case BuiltinType::ULong:     OS << "UL"; break;
   case BuiltinType::LongLong:  OS << "LL"; break;
   case BuiltinType::ULongLong: OS << "ULL"; break;
+  case BuiltinType::MetaobjectId: OS << "MOI"; break;
   }
 }
 
@@ -1491,6 +1492,26 @@ void StmtPrinter::VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *Node){
     OS << " ";
     PrintExpr(Node->getArgumentExpr());
   }
+}
+
+void StmtPrinter::VisitReflexprExpr(ReflexprExpr *Node){
+  // TODO[reflexpr]
+  OS << "__reflexpr";
+  OS << '(';
+  OS << ')';
+}
+
+void StmtPrinter::VisitMetaobjectIdExpr(MetaobjectIdExpr *Node) {
+  OS << "__metaobject_id(";
+  OS << Node->getValue();
+  OS << ')';
+}
+
+void StmtPrinter::VisitMetaobjectOpExpr(MetaobjectOpExpr *Node){
+  // TODO[reflexpr]
+  OS << "__metaobj_";
+  OS << '(';
+  OS << ')';
 }
 
 void StmtPrinter::VisitGenericSelectionExpr(GenericSelectionExpr *Node) {

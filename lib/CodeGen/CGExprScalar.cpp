@@ -245,6 +245,11 @@ public:
   }
   Value *VisitOffsetOfExpr(OffsetOfExpr *E);
   Value *VisitUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *E);
+
+  Value *VisitReflexprExpr(const ReflexprExpr *E);
+  Value *VisitMetaobjectIdExpr(const MetaobjectIdExpr *E);
+  Value *VisitMetaobjectOpExpr(const MetaobjectOpExpr *E);
+
   Value *VisitAddrLabelExpr(const AddrLabelExpr *E) {
     llvm::Value *V = CGF.GetAddrOfLabel(E->getLabel());
     return Builder.CreateBitCast(V, ConvertType(E->getType()));
@@ -2034,6 +2039,26 @@ ScalarExprEmitter::VisitUnaryExprOrTypeTraitExpr(
   // If this isn't sizeof(vla), the result must be constant; use the constant
   // folding logic so we don't have to duplicate it here.
   return Builder.getInt(E->EvaluateKnownConstInt(CGF.getContext()));
+}
+
+/// VisitReflexprExpr - Return the __metaobject_id reflecting the
+/// argument of the __reflexpr expression.
+Value *
+ScalarExprEmitter::VisitReflexprExpr(const ReflexprExpr *E) {
+  return llvm::ConstantInt::get(CGF.SizeTy, E->getIdValue(CGF.getContext()));
+}
+
+/// VisitMetaobjectOpExpr - Return a piece of metadata
+Value *
+ScalarExprEmitter::VisitMetaobjectOpExpr(const MetaobjectOpExpr *E) {
+
+  llvm::Type* ResTy = ConvertType(E->getType());
+  return llvm::ConstantInt::get(ResTy, E->getIntResult(CGF.getContext()));
+}
+
+Value *
+ScalarExprEmitter::VisitMetaobjectIdExpr(const MetaobjectIdExpr *E) {
+  return llvm::ConstantInt::get(CGF.SizeTy, E->getValue());
 }
 
 Value *ScalarExprEmitter::VisitUnaryReal(const UnaryOperator *E) {
