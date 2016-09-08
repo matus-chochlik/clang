@@ -720,6 +720,8 @@ Sema::CheckNonTypeTemplateParameterType(QualType T, SourceLocation Loc) {
   //
   //       -- integral or enumeration type,
   if (T->isIntegralOrEnumerationType() ||
+      //   -- metaobject id type,
+      T->isMetaobjectIdType() ||
       //   -- pointer to object or pointer to function,
       T->isPointerType() ||
       //   -- reference to object or reference to function,
@@ -2159,6 +2161,44 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
                                        TemplateLoc, SyntheticTemplateArgs);
   }
 
+  case BTK__unpack_metaobject_seq: {
+    // Specializations of __unpack_metaobject_seq<MOID> are treated like
+    // S<MOID0, ..., MOIDN>.
+
+    TemplateArgument MoIdArg = Converted[1];
+    llvm::APSInt MoId = MoIdArg.getAsIntegral();
+    uintptr_t moid = MoId.getZExtValue();
+
+    if (const auto *RE = ReflexprExpr::fromMetaobjectId(Context, moid)) {
+      if (!RE->reflectsType()) {
+        SourceLocation argLoc = TemplateArgs[1].getLocation(); 
+        SemaRef.Diag(argLoc, diag::err_unpack_metaobject_seq_not_applicable)
+          << RE->getMetaobjectKindName(RE->getKind());
+        return QualType();
+      }
+    } else {
+      SourceLocation argLoc = TemplateArgs[1].getLocation(); 
+      SemaRef.Diag(argLoc, diag::err_expected_metaobject_id_expr);
+      return QualType();
+    }
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    std::vector<llvm::APSInt> Elems;
+    UnaryMetaobjectOpExpr::unpackSequence(Context, moid, Elems);
+    // Expand MOID into MOID0 ... MOIDN.
+    for (llvm::APSInt& Arg : Elems) {
+      TemplateArgument TA(Context, Arg, Context.getMetaobjectIdType());
+      Expr *E = SemaRef.BuildExpressionFromIntegralTemplateArgument(
+                          TA, TemplateArgs[0].getLocation()).getAs<Expr>();
+      SyntheticTemplateArgs.addArgument(
+          TemplateArgumentLoc(TemplateArgument(E), E));
+    }
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                        TemplateLoc, SyntheticTemplateArgs);
+  }
+
   case BTK__type_pack_element:
     // Specializations of
     //    __type_pack_element<Index, T_1, ..., T_N>
@@ -2181,6 +2221,7 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
     auto Nth = std::next(Ts.pack_begin(), Index.getExtValue());
     return Nth->getAsType();
   }
+
   llvm_unreachable("unexpected BuiltinTemplateDecl!");
 }
 
@@ -4227,6 +4268,10 @@ bool UnnamedLocalNoLinkageFinder::VisitDecltypeType(const DecltypeType*) {
   return false;
 }
 
+bool UnnamedLocalNoLinkageFinder::VisitUnrefltypeType(const UnrefltypeType*) {
+  return false;
+}
+
 bool UnnamedLocalNoLinkageFinder::VisitUnaryTransformType(
                                                     const UnaryTransformType*) {
   return false;
@@ -5030,7 +5075,8 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
       Converted = TemplateArgument(CanonParamType, /*isNullPtr*/true);
       break;
     case APValue::Int:
-      assert(ParamType->isIntegralOrEnumerationType());
+      assert(ParamType->isIntegralOrEnumerationType() ||
+             ParamType->isMetaobjectIdType());
       Converted = TemplateArgument(Context, Value.getInt(), CanonParamType);
       break;
     case APValue::MemberPointer: {
@@ -5285,6 +5331,28 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
                                  ParamType->isEnumeralType() 
                                    ? Context.getCanonicalType(ParamType)
                                    : IntegerType);
+    return Arg;
+  }
+
+  /// Handle __metaobject_id type
+  if (ParamType->isMetaobjectIdType()) {
+    // TODO[reflexpr]
+
+    if (Arg->isValueDependent()) {
+      // The argument is value-dependent. Create a new
+      // TemplateArgument with the converted expression.
+      Converted = TemplateArgument(Arg);
+      return Arg;
+    }
+
+    APValue V;
+    ExprResult ArgResult = // TODO[reflexpr] require int
+      CheckConvertedConstantExpression(Arg, ParamType, V, CCEK_TemplateArg);
+    if (ArgResult.isInvalid())
+      return ExprError();
+
+    Converted = TemplateArgument(Context, V.getInt(),
+                                 Context.getCanonicalType(ParamType));
     return Arg;
   }
 
@@ -5639,6 +5707,9 @@ Sema::BuildExpressionFromIntegralTemplateArgument(const TemplateArgument &Arg,
                                          T, Loc);
   } else if (T->isNullPtrType()) {
     E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, Loc);
+  } else if (T->isMetaobjectIdType()) {
+    E = new (Context) MetaobjectIdExpr(Arg.getAsIntegral().getZExtValue(),
+                                       Context.MetaobjectIdTy, Loc);
   } else {
     E = IntegerLiteral::Create(Context, Arg.getAsIntegral(), T, Loc);
   }

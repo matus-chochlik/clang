@@ -19,6 +19,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/AST/TypeLocVisitor.h"
 #include "clang/Basic/PartialDiagnostic.h"
@@ -1244,6 +1245,9 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
 
   QualType Result;
   switch (DS.getTypeSpecType()) {
+  case DeclSpec::TST_metaobject_id:
+    Result = Context.MetaobjectIdTy;
+    break;
   case DeclSpec::TST_void:
     Result = Context.VoidTy;
     break;
@@ -1531,6 +1535,17 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     assert(E && "Didn't get an expression for decltype?");
     // TypeQuals handled by caller.
     Result = S.BuildDecltypeType(E, DS.getTypeSpecTypeLoc());
+    if (Result.isNull()) {
+      Result = Context.IntTy;
+      declarator.setInvalidType(true);
+    }
+    break;
+  }
+  case DeclSpec::TST_unrefltype: {
+    Expr *E = DS.getRepAsExpr();
+    assert(E && "Didn't get an expression for unrefltype?");
+    // TypeQuals handled by caller.
+    Result = S.BuildUnrefltypeType(E, DS.getTypeSpecTypeLoc());
     if (Result.isNull()) {
       Result = Context.IntTy;
       declarator.setInvalidType(true);
@@ -7332,6 +7347,49 @@ QualType Sema::BuildDecltypeType(Expr *E, SourceLocation Loc,
   }
 
   return Context.getDecltypeType(E, getDecltypeForExpr(*this, E));
+}
+
+static QualType getUnrefltypeForExpr(Sema &S, Expr *E, SourceLocation Loc) {
+  if (E->isInstantiationDependent() || E->isValueDependent())
+    return S.Context.DependentTy;
+
+  if (ReflexprExpr *RE = ReflexprExpr::fromExpr(S.Context, E)) {
+    QualType result;
+    if (RE->reflectsType()) {
+      result = RE->getReflectedType();
+    }
+    if (result.isNull()) {
+      S.Diag(Loc, diag::err_unrefltype_operator_not_applicable_to_metaobject)
+        << RE->getMetaobjectKindName();
+    }
+    return result;
+  }
+
+  if (UnaryMetaobjectOpExpr *UMOE = dyn_cast<UnaryMetaobjectOpExpr>(E)) {
+    QualType result = UMOE->getOpResultType(S.Context);
+    if (result.isNull()) {
+      S.Diag(Loc, diag::err_unrefltype_operator_not_applicable_to_operation)
+        << UMOE->getOperationSpelling();
+    }
+    return result;
+  }
+  llvm_unreachable("unable to get type for unreflexpr");
+}
+
+QualType Sema::BuildUnrefltypeType(Expr *E, SourceLocation Loc,
+                                   bool AsUnevaluated) {
+  ExprResult ER = CheckPlaceholderExpr(E);
+  if (ER.isInvalid()) return QualType();
+  E = ER.get();
+
+  if (AsUnevaluated && ActiveTemplateInstantiations.empty() &&
+      E->HasSideEffects(Context, false)) {
+    // The expression operand for decltype is in an unevaluated expression
+    // context, so side effects could result in unintended consequences.
+    Diag(E->getExprLoc(), diag::warn_side_effects_unevaluated_context);
+  }
+
+  return Context.getUnrefltypeType(E, getUnrefltypeForExpr(*this, E, Loc));
 }
 
 QualType Sema::BuildUnaryTransformType(QualType BaseType,

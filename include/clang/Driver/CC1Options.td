@@ -640,6 +640,10 @@ def finclude_default_header : Flag<["-"], "finclude-default-header">,
 def fcoroutines : Flag<["-"], "fcoroutines">,
   HelpText<"Enable support for the C++ Coroutines TS">;
 
+// Reflection
+def freflection : Flag<["-"], "freflection">,
+  HelpText<"Enable support for the C++ Reflection">;
+
 //===----------------------------------------------------------------------===//
 // Header Search Options
 //===----------------------------------------------------------------------===//

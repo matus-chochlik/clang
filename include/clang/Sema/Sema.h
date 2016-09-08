@@ -35,6 +35,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TemplateKinds.h"
 #include "clang/Basic/TypeTraits.h"
+#include "clang/Basic/Metaobjects.h"
 #include "clang/Sema/AnalysisBasedWarnings.h"
 #include "clang/Sema/CleanupInfo.h"
 #include "clang/Sema/DeclSpec.h"
@@ -843,6 +844,9 @@ public:
     /// \brief Whether we are in a decltype expression.
     bool IsDecltype;
 
+    /// \brief Whether we are in an unrefltype expression
+    bool IsUnrefltype;
+
     /// \brief The number of active cleanup objects when we entered
     /// this expression evaluation context.
     unsigned NumCleanupObjects;
@@ -881,9 +885,10 @@ public:
                                       unsigned NumCleanupObjects,
                                       CleanupInfo ParentCleanup,
                                       Decl *ManglingContextDecl,
-                                      bool IsDecltype)
+                                      bool IsDecltype, bool IsUnrefltype=false)
       : Context(Context), ParentCleanup(ParentCleanup),
-        IsDecltype(IsDecltype), NumCleanupObjects(NumCleanupObjects),
+        IsDecltype(IsDecltype), IsUnrefltype(IsUnrefltype),
+        NumCleanupObjects(NumCleanupObjects),
         NumTypos(0),
         ManglingContextDecl(ManglingContextDecl), MangleNumbering() { }
 
@@ -1501,6 +1506,8 @@ public:
   /// context, such as when building a type for decltype(auto).
   QualType BuildDecltypeType(Expr *E, SourceLocation Loc,
                              bool AsUnevaluated = true);
+  QualType BuildUnrefltypeType(Expr *E, SourceLocation Loc,
+                               bool AsUnevaluated = true);
   QualType BuildUnaryTransformType(QualType BaseType,
                                    UnaryTransformType::UTTKind UKind,
                                    SourceLocation Loc);
@@ -3680,11 +3687,13 @@ public:
 
   void PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
                                        Decl *LambdaContextDecl = nullptr,
-                                       bool IsDecltype = false);
+                                       bool IsDecltype = false,
+                                       bool IsUnrefltype = false);
   enum ReuseLambdaContextDecl_t { ReuseLambdaContextDecl };
   void PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
                                        ReuseLambdaContextDecl_t,
-                                       bool IsDecltype = false);
+                                       bool IsDecltype = false,
+                                       bool IsUnrefltype = false);
   void PopExpressionEvaluationContext();
 
   void DiscardCleanupsInEvaluationContext();
@@ -3941,6 +3950,83 @@ public:
                                   UnaryExprOrTypeTrait ExprKind,
                                   bool IsType, void *TyOrEx,
                                   SourceRange ArgRange);
+
+  ExprResult GetReflexprGSExpr(SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult GetReflexprSpecExpr(tok::TokenKind SpecTok,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult GetReflexprNamedDeclExpr(const NamedDecl *nDecl,
+                                   SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult GetReflexprTypeExpr(const TypeSourceInfo *TInfo, bool removeSugar,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult GetReflexprTypeExpr(QualType Ty, bool removeSugar,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+
+  ExprResult OptionallyWrapReflexprExpr(bool idOnly, ExprResult E);
+
+  ExprResult ActOnReflexprGSExpr(bool idOnly,
+                                 SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprSpecExpr(bool idOnly, tok::TokenKind SpecTok,
+                                   SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprScopedExpr(bool idOnly, Scope *S, CXXScopeSpec& SS,
+                                   const IdentifierInfo& Ident,
+                                   SourceLocation opLoc, SourceRange argRange);
+  ExprResult ActOnReflexprTypeExpr(bool idOnly, Scope *S, Declarator& D,
+                                   SourceLocation opLoc, SourceRange argRange);
+
+
+  ExprResult
+  CreateUnaryPtrMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                 MetaobjectOpResult OpRes, ExprResult argExpr,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateNaryPtrMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                MetaobjectOpResult OpRes,
+                                unsigned arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateUnaryStrMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                 MetaobjectOpResult OpRes, ExprResult argExpr,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateNaryStrMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                MetaobjectOpResult OpRes,
+                                unsigned arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateUnaryIntMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                 MetaobjectOpResult OpRes, ExprResult argExpr,
+                                 SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateNaryIntMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                MetaobjectOpResult OpRes,
+                                unsigned arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateUnaryMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                              MetaobjectOpResult OpRes, ExprResult argExpr,
+                              SourceLocation opLoc, SourceLocation endLoc);
+  ExprResult
+  CreateNaryMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                             MetaobjectOpResult OpRes,
+                             unsigned arity, ExprResult* argExpr,
+                             SourceLocation opLoc, SourceLocation endLoc);
+
+  ExprResult
+  ActOnUnaryMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                             MetaobjectOpResult OpRes, ExprResult argExpr,
+                             SourceLocation opLoc, SourceLocation endLoc);
+
+  ExprResult
+  ActOnNaryMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                            MetaobjectOpResult OpRes,
+                            unsigned arity, ExprResult* argExpr,
+                            SourceLocation opLoc, SourceLocation endLoc);
+
+  ExprResult ActOnUnrefltypeExpression(Expr *E, SourceLocation opLoc);
+
+  bool ActOnCXXNestedNameSpecifierUnrefltype(CXXScopeSpec &SS,
+                                             const DeclSpec &DS,
+                                             SourceLocation ColonColonLoc);
 
   ExprResult CheckPlaceholderExpr(Expr *E);
   bool CheckVecStepExpr(Expr *E);
@@ -9804,6 +9890,31 @@ public:
   ~EnterExpressionEvaluationContext() {
     if (Entered)
       Actions.PopExpressionEvaluationContext();
+  }
+};
+
+class EnterUnrefltypeEvaluationContext {
+  Sema &Actions;
+
+public:
+  EnterUnrefltypeEvaluationContext(Sema &Actions,
+                                   Sema::ExpressionEvaluationContext NewContext,
+                                   Decl *LambdaContextDecl = nullptr)
+      : Actions(Actions) {
+    Actions.PushExpressionEvaluationContext(NewContext, LambdaContextDecl,
+                                            false/*IsDecltype*/, true);
+  }
+  EnterUnrefltypeEvaluationContext(Sema &Actions,
+                                   Sema::ExpressionEvaluationContext NewContext,
+                                   Sema::ReuseLambdaContextDecl_t)
+    : Actions(Actions) {
+    Actions.PushExpressionEvaluationContext(NewContext, 
+                                            Sema::ReuseLambdaContextDecl,
+                                            false/*IsDecltype*/, true);
+  }
+
+  ~EnterUnrefltypeEvaluationContext() {
+    Actions.PopExpressionEvaluationContext();
   }
 };
 
