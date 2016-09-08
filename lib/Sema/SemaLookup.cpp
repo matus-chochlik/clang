@@ -682,6 +682,9 @@ static bool LookupBuiltin(Sema &S, LookupResult &R) {
         } else if (II == S.getASTContext().getTypePackElementName()) {
           R.addDecl(S.getASTContext().getTypePackElementDecl());
           return true;
+        } else if (II == S.getASTContext().getUnpackMetaobjectSeqName()) {
+          R.addDecl(S.getASTContext().getUnpackMetaobjectSeqDecl());
+          return true;
         }
       }
 

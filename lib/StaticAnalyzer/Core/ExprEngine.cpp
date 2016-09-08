@@ -926,6 +926,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::CXXPseudoDestructorExprClass:
     case Stmt::SubstNonTypeTemplateParmExprClass:
     case Stmt::CXXNullPtrLiteralExprClass:
+    case Stmt::MetaobjectIdExprClass:
     case Stmt::OMPArraySectionExprClass:
     case Stmt::TypeTraitExprClass: {
       Bldr.takeNodes(Pred);
@@ -1288,6 +1289,24 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
       Bldr.takeNodes(Pred);
       VisitUnaryExprOrTypeTraitExpr(cast<UnaryExprOrTypeTraitExpr>(S),
                                     Pred, Dst);
+      Bldr.addNodes(Dst);
+      break;
+
+    case Stmt::ReflexprExprClass:
+      Bldr.takeNodes(Pred);
+      VisitReflexprExpr(cast<ReflexprExpr>(S), Pred, Dst);
+      Bldr.addNodes(Dst);
+      break;
+
+    case Stmt::UnaryMetaobjectOpExprClass:
+      Bldr.takeNodes(Pred);
+      VisitUnaryMetaobjectOpExpr(cast<UnaryMetaobjectOpExpr>(S), Pred, Dst);
+      Bldr.addNodes(Dst);
+      break;
+
+    case Stmt::NaryMetaobjectOpExprClass:
+      Bldr.takeNodes(Pred);
+      VisitNaryMetaobjectOpExpr(cast<NaryMetaobjectOpExpr>(S), Pred, Dst);
       Bldr.addNodes(Dst);
       break;
 

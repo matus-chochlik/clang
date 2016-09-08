@@ -1684,6 +1684,9 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   case BuiltinType::ULong:
     Out << 'K';
     break;
+  case BuiltinType::MetaobjectId:
+    Out << "MO";
+    break;
   case BuiltinType::Float:
     Out << 'M';
     break;
@@ -2412,6 +2415,15 @@ void MicrosoftCXXNameMangler::mangleType(const DecltypeType *T, Qualifiers,
   DiagnosticsEngine &Diags = Context.getDiags();
   unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
     "cannot mangle this decltype() yet");
+  Diags.Report(Range.getBegin(), DiagID)
+    << Range;
+}
+
+void MicrosoftCXXNameMangler::mangleType(const UnrefltypeType *T, Qualifiers,
+                                         SourceRange Range) {
+  DiagnosticsEngine &Diags = Context.getDiags();
+  unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
+    "cannot mangle this unrefltype() yet");
   Diags.Report(Range.getBegin(), DiagID)
     << Range;
 }

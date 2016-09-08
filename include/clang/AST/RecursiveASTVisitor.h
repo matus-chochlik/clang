@@ -1002,6 +1002,9 @@ DEF_TRAVERSE_TYPE(TypeOfType, { TRY_TO(TraverseType(T->getUnderlyingType())); })
 DEF_TRAVERSE_TYPE(DecltypeType,
                   { TRY_TO(TraverseStmt(T->getUnderlyingExpr())); })
 
+DEF_TRAVERSE_TYPE(UnrefltypeType,
+                  { TRY_TO(TraverseStmt(T->getUnderlyingExpr())); })
+
 DEF_TRAVERSE_TYPE(UnaryTransformType, {
   TRY_TO(TraverseType(T->getBaseType()));
   TRY_TO(TraverseType(T->getUnderlyingType()));
@@ -1221,6 +1224,10 @@ DEF_TRAVERSE_TYPELOC(TypeOfType, {
 
 // FIXME: location of underlying expr
 DEF_TRAVERSE_TYPELOC(DecltypeType, {
+  TRY_TO(TraverseStmt(TL.getTypePtr()->getUnderlyingExpr()));
+})
+
+DEF_TRAVERSE_TYPELOC(UnrefltypeType, {
   TRY_TO(TraverseStmt(TL.getTypePtr()->getUnderlyingExpr()));
 })
 
@@ -2246,6 +2253,25 @@ DEF_TRAVERSE_STMT(UnaryExprOrTypeTraitExpr, {
   // but not if it's a type.
   if (S->isArgumentType())
     TRY_TO(TraverseTypeLoc(S->getArgumentTypeInfo()->getTypeLoc()));
+})
+
+DEF_TRAVERSE_STMT(ReflexprExpr, {
+  // The child-iterator will pick up the arg if it's an expression,
+  // but not if it's a type.
+  if (S->isArgumentType())
+    TRY_TO(TraverseTypeLoc(S->getArgumentTypeInfo()->getTypeLoc()));
+})
+
+DEF_TRAVERSE_STMT(MetaobjectIdExpr, {
+  // TODO[reflexpr]
+})
+
+DEF_TRAVERSE_STMT(UnaryMetaobjectOpExpr, {
+  // TODO[reflexpr]
+})
+
+DEF_TRAVERSE_STMT(NaryMetaobjectOpExpr, {
+  // TODO[reflexpr]
 })
 
 DEF_TRAVERSE_STMT(CXXTypeidExpr, {

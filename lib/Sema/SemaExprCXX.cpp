@@ -4918,6 +4918,371 @@ QualType Sema::CheckPointerToMemberOperands(ExprResult &LHS, ExprResult &RHS,
   return Result;
 }
 
+ExprResult
+Sema::OptionallyWrapReflexprExpr(bool idOnly, ExprResult E) {
+  // TODO[reflexpr] wrap the expression into std::meta::__metaobject
+  // if not idOnly
+  if (!idOnly) {
+  }
+  return E;
+}
+
+ExprResult
+Sema::GetReflexprGSExpr(SourceLocation opLoc, SourceLocation endLoc) {
+  return ReflexprExpr::getGSReflexprExpr(Context, opLoc, endLoc);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr([::]) expression
+ExprResult
+Sema::ActOnReflexprGSExpr(bool idOnly,
+                          SourceLocation opLoc, SourceRange argRange) {
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprGSExpr(opLoc, argRange.getEnd()));
+}
+
+ExprResult
+Sema::GetReflexprSpecExpr(tok::TokenKind specTok,
+                          SourceLocation opLoc, SourceLocation endLoc) {
+  return ReflexprExpr::getSpecifierReflexprExpr(Context, specTok,
+                                                opLoc, endLoc);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr(specifier) expression
+ExprResult
+Sema::ActOnReflexprSpecExpr(bool idOnly, tok::TokenKind specTok,
+                            SourceLocation opLoc, SourceRange argRange) {
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprSpecExpr(specTok, opLoc, argRange.getEnd()));
+}
+
+ExprResult
+Sema::GetReflexprNamedDeclExpr(const NamedDecl* nDecl,
+                               SourceLocation opLoc, SourceLocation endLoc) {
+  return ReflexprExpr::getNamedDeclReflexprExpr(Context, nDecl,
+                                                opLoc, endLoc);
+}
+
+/// ActOnUnaryExprOrTypeTraitExpr - Handle reflexpr(name) expression
+ExprResult
+Sema::ActOnReflexprScopedExpr(bool idOnly, Scope* S, CXXScopeSpec& SS,
+                              const IdentifierInfo& Ident,
+                              SourceLocation opLoc, SourceRange argRange) {
+  LookupResult R(*this, &Ident, argRange.getBegin(), LookupOrdinaryName);
+  LookupParsedName(R, S, &SS);
+
+  if (!R.empty() && !R.isAmbiguous()) {
+    if (const NamedDecl* nDecl = R.getFoundDecl()) {
+      if (!isa<TemplateTypeParmDecl>(nDecl)) {
+        return OptionallyWrapReflexprExpr(idOnly,
+                 GetReflexprNamedDeclExpr(nDecl, opLoc, argRange.getEnd()));
+      }
+    }
+  }
+  return ExprError();
+}
+
+ExprResult
+Sema::GetReflexprTypeExpr(const TypeSourceInfo *TInfo, bool removeSugar,
+                          SourceLocation opLoc, SourceLocation endLoc) {
+  return ReflexprExpr::getTypeReflexprExpr(Context, TInfo, removeSugar,
+		                           opLoc, endLoc);
+}
+
+ExprResult
+Sema::GetReflexprTypeExpr(QualType Ty, bool removeSugar,
+                          SourceLocation opLoc, SourceLocation endLoc) {
+  return ReflexprExpr::getTypeReflexprExpr(Context, Ty, removeSugar,
+		                           opLoc, endLoc);
+}
+
+ExprResult
+Sema::ActOnReflexprTypeExpr(bool idOnly, Scope *S, Declarator &D,
+                                 SourceLocation opLoc, SourceRange argRange) {
+  assert(D.getIdentifier() == nullptr &&
+         "Type name should have no identifier!");
+
+  TypeSourceInfo *TInfo = GetTypeForDeclarator(D, S);
+  return OptionallyWrapReflexprExpr(idOnly,
+           GetReflexprTypeExpr(TInfo, true, opLoc, argRange.getEnd()));
+}
+
+ExprResult
+Sema::CreateUnaryIntMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                     MetaobjectOpResult OpRes,
+                                     ExprResult argExpr,
+                                     SourceLocation opLoc,
+                                     SourceLocation endLoc) {
+  assert((OpRes != MOOR_String) &&
+         "Cannot handle a string-returning operation here");
+  assert(argExpr.isUsable());
+
+  // TODO[reflexpr] check if the arg expr is valid and yield metaobject id
+  Expr* ArgExpr = argExpr.get();
+
+  QualType resType =
+    UnaryMetaobjectOpExpr::getResultKindType(Context, 1, &ArgExpr, OpRes);
+
+  return new (Context) UnaryMetaobjectOpExpr(Context, Oper, OpRes, resType,
+                                             argExpr.get(), opLoc, endLoc);
+}
+
+ExprResult
+Sema::CreateNaryIntMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                    MetaobjectOpResult OpRes,
+                                    unsigned Arity, ExprResult* argExpr,
+                                    SourceLocation opLoc,
+                                    SourceLocation endLoc) {
+  assert((OpRes != MOOR_String) &&
+         "Cannot handle a string-returning operation here");
+  assert(argExpr[0].isUsable());
+
+  // TODO[reflexpr] check if the arg exprs are valid and yield metaobject ids
+
+  for (unsigned i=1; i<Arity; ++i) {
+    assert(argExpr[i].isUsable());
+  }
+
+  Expr* ArgExpr[NaryMetaobjectOpExpr::MaxArity];
+  for(unsigned i=0; i<Arity; ++i) {
+    ArgExpr[i] = argExpr[i].get();
+  }
+
+  QualType resType =
+    NaryMetaobjectOpExpr::getResultKindType(Context, Arity, ArgExpr, OpRes);
+
+  return new (Context) NaryMetaobjectOpExpr(Context, Oper, OpRes, resType,
+                                            Arity, ArgExpr, opLoc, endLoc);
+}
+
+ExprResult
+Sema::CreateUnaryPtrMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                     MetaobjectOpResult OpRes,
+                                     ExprResult argExpr,
+                                     SourceLocation opLoc,
+                                     SourceLocation endLoc) {
+  assert((OpRes == MOOR_Pointer) &&
+         "Cannot handle a non-pointer-returning operation here");
+  assert(argExpr.isUsable());
+
+  bool recreate = ExprEvalContexts.back().IsUnrefltype;
+  recreate |= argExpr.get()->isTypeDependent();
+  recreate |= argExpr.get()->isValueDependent();
+  recreate |= argExpr.get()->isInstantiationDependent();
+
+  if(recreate) {
+    return new (Context) UnaryMetaobjectOpExpr(Context, Oper,
+                                               OpRes, Context.DependentTy,
+                                               argExpr.get(), opLoc, endLoc);
+  } else {
+    ValueDecl *valDecl = const_cast<ValueDecl*>(
+      UnaryMetaobjectOpExpr::getValueDeclResult(Context, Oper, argExpr.get()));
+
+    assert(valDecl != nullptr);
+    QualType valPtrTy =
+      UnaryMetaobjectOpExpr::getValueDeclType(Context, Oper, valDecl);
+
+    // TODO[reflexpr] WE are just fooling the later checks, into thinking
+    // that the DRE had some nested-name specifier here.
+    // Do we need to build a *valid* NNS ?
+    NestedNameSpecifierLocBuilder NNSLB;
+    NNSLB.MakeGlobal(Context, opLoc);
+
+    DeclRefExpr *valDeclRefExpr = DeclRefExpr::Create(Context,
+                                             NNSLB.getWithLocInContext(Context),
+                                             opLoc,
+                                             valDecl,
+                                             false /*EnclVarOrCapture?*/,
+                                             opLoc,
+                                             valDecl->getType(),
+                                             VK_LValue,
+                                             valDecl,
+                                             nullptr);
+
+    MarkDeclRefReferenced(valDeclRefExpr);
+    if (const FieldDecl* fldDecl = dyn_cast<FieldDecl>(valDecl)) {
+      UnusedPrivateFields.remove(fldDecl);
+    }
+
+    UnaryOperator* result = new (Context) UnaryOperator(valDeclRefExpr,
+                           UO_AddrOf, valPtrTy, VK_RValue, OK_Ordinary, opLoc);
+    UpdateMarkingForLValueToRValue(result);
+    return result;
+  }
+}
+
+ExprResult
+Sema::CreateNaryPtrMetaobjectOpExpr(NaryMetaobjectOp,
+                                    MetaobjectOpResult,
+                                    unsigned, ExprResult*,
+                                    SourceLocation,
+                                    SourceLocation) {
+  llvm_unreachable("No n-ary pointer-returning metaobject operations!");
+}
+
+ExprResult
+Sema::CreateUnaryStrMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                     MetaobjectOpResult OpRes,
+                                     ExprResult argExpr,
+                                     SourceLocation opLoc,
+                                     SourceLocation endLoc) {
+  assert((OpRes == MOOR_String) &&
+         "Cannot handle a non-string-returning operation here");
+  assert(argExpr.isUsable());
+
+  // TODO[reflexpr] check if the arg exprs are valid and yield metaobject ids
+
+  bool recreate = ExprEvalContexts.back().IsUnrefltype;
+  recreate |= argExpr.get()->isTypeDependent();
+  recreate |= argExpr.get()->isValueDependent();
+  recreate |= argExpr.get()->isInstantiationDependent();
+
+  if(recreate) {
+    return new (Context) UnaryMetaobjectOpExpr(Context, Oper,
+                                               OpRes, Context.DependentTy,
+                                               argExpr.get(), opLoc, endLoc);
+  } else {
+    std::string Value = UnaryMetaobjectOpExpr::getStrResult(Context, Oper,
+                                                            argExpr.get());
+    QualType CharTyConst = Context.CharTy;
+    CharTyConst.addConst();
+
+    QualType StrTy = Context.getConstantArrayType(CharTyConst,
+                                   llvm::APInt(32, Value.size()+1),
+                                   ArrayType::Normal, 0);
+
+    return StringLiteral::Create(Context, Value, StringLiteral::UTF8,
+                                 false/*pascal*/, StrTy, &opLoc, 1);
+  }
+}
+
+ExprResult
+Sema::CreateNaryStrMetaobjectOpExpr(NaryMetaobjectOp,
+                                    MetaobjectOpResult,
+                                    unsigned, ExprResult*,
+                                    SourceLocation,
+                                    SourceLocation) {
+  llvm_unreachable("No n-ary string-returning metaobject operations!");
+}
+
+ExprResult
+Sema::CreateUnaryMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                  MetaobjectOpResult OpRes,
+                                  ExprResult argExpr,
+                                  SourceLocation opLoc,
+                                  SourceLocation endLoc) {
+  Expr* moE = argExpr.get();
+
+  bool doChecks = !moE->isInstantiationDependent();
+
+  if (doChecks) {
+    uintptr_t moid;
+
+    if (!UnaryMetaobjectOpExpr::queryExprMetaobjectId(Context, moid, moE)){
+      Diag(opLoc, diag::err_expected_metaobject_id_expr);
+      return ExprError();
+    }
+    if (!UnaryMetaobjectOpExpr::isOperationApplicable(Context, moid, Oper)) {
+      Diag(opLoc, diag::err_metaobject_operation_not_applicable)
+        << UnaryMetaobjectOpExpr::getOperationSpelling(Oper)
+        << ReflexprExpr::getMetaobjectKindName(Context, moid);
+
+      return ExprError();
+    }
+  }
+
+  if (OpRes == MOOR_Pointer) {
+    return CreateUnaryPtrMetaobjectOpExpr(Oper, OpRes, argExpr, opLoc, endLoc);
+  } else if (OpRes == MOOR_String) {
+    return CreateUnaryStrMetaobjectOpExpr(Oper, OpRes, argExpr, opLoc, endLoc);
+  } else {
+    return CreateUnaryIntMetaobjectOpExpr(Oper, OpRes, argExpr, opLoc, endLoc);
+  }
+}
+
+ExprResult
+Sema::CreateNaryMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                 MetaobjectOpResult OpRes,
+                                 unsigned Arity, ExprResult* argExpr,
+                                 SourceLocation opLoc,
+                                 SourceLocation endLoc) {
+
+  for (unsigned i=0; i<Arity; ++i) {
+
+    Expr* moE = argExpr[i].get();
+    bool doChecks = !moE->isInstantiationDependent();
+    
+    if (doChecks) {
+      uintptr_t moid;
+
+      if (NaryMetaobjectOpExpr::queryExprMetaobjectId(Context, moid, moE)){
+        if (!NaryMetaobjectOpExpr::isOperationApplicable(Context, moid, Oper)) {
+          Diag(opLoc, diag::err_metaobject_operation_not_applicable)
+            << NaryMetaobjectOpExpr::getOperationSpelling(Oper)
+            << ReflexprExpr::getMetaobjectKindName(Context, moid);
+
+          return ExprError();
+        }
+      } else if (i == 0) {
+        Diag(opLoc, diag::err_expected_metaobject_id_expr);
+        return ExprError();
+      }
+    }
+  }
+
+  if (OpRes == MOOR_Pointer) {
+    return CreateNaryPtrMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                         opLoc, endLoc);
+  } else if (OpRes == MOOR_String) {
+    return CreateNaryStrMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                         opLoc, endLoc);
+  } else {
+    return CreateNaryIntMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                         opLoc, endLoc);
+  }
+}
+
+ExprResult
+Sema::ActOnUnaryMetaobjectOpExpr(UnaryMetaobjectOp Oper,
+                                 MetaobjectOpResult OpRes,
+                                 ExprResult argExpr,
+                                 SourceLocation opLoc, SourceLocation endLoc) {
+
+  return CreateUnaryMetaobjectOpExpr(Oper, OpRes, argExpr, opLoc, endLoc);
+}
+
+ExprResult
+Sema::ActOnNaryMetaobjectOpExpr(NaryMetaobjectOp Oper,
+                                MetaobjectOpResult OpRes,
+                                unsigned Arity, ExprResult* argExpr,
+                                SourceLocation opLoc, SourceLocation endLoc) {
+
+  return CreateNaryMetaobjectOpExpr(Oper, OpRes, Arity, argExpr,
+                                    opLoc, endLoc);
+}
+
+ExprResult Sema::ActOnUnrefltypeExpression(Expr *E, SourceLocation opLoc) {
+
+  if (!E->isInstantiationDependent()) {
+    if (const auto *RE = ReflexprExpr::fromExpr(Context, E)) {
+      if (!RE->reflectsType()) {
+        Diag(opLoc, diag::err_unrefltype_operator_not_applicable_to_metaobject)
+          << RE->getMetaobjectKindName();
+        return ExprError();
+      }
+    } else if (const auto *UMOE = dyn_cast<UnaryMetaobjectOpExpr>(E)) {
+      if (!UMOE->hasOpResultType()) {
+        Diag(opLoc, diag::err_unrefltype_operator_not_applicable_to_metaobject)
+          << RE->getMetaobjectKindName();
+        return ExprError();
+      }
+    } else {
+      Diag(opLoc, diag::err_expected_metaobject_id_expr);
+      return ExprError();
+    }
+  }
+  return E;
+}
+
 /// \brief Try to convert a type to another according to C++11 5.16p3.
 ///
 /// This is part of the parameter validation for the ? operator. If either

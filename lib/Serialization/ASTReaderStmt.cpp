@@ -607,6 +607,63 @@ void ASTStmtReader::VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *E) {
   E->setRParenLoc(ReadSourceLocation(Record, Idx));
 }
 
+void ASTStmtReader::VisitReflexprExpr(ReflexprExpr *E) {
+  VisitExpr(E);
+  E->setKind(static_cast<MetaobjectKind>(Record[Idx++]));
+  E->setSeqKind(static_cast<MetaobjectSequenceKind>(Record[Idx++]));
+  E->setArgKind(static_cast<ReflexprExpr::ArgumentKind>(Record[Idx++]));
+  switch(E->getArgKind()) {
+    case ReflexprExpr::REAK_Nothing:
+      break;
+    case ReflexprExpr::REAK_Specifier:
+      E->setArgumentSpecifierKind(static_cast<tok::TokenKind>(Record[Idx++]));
+      break;
+    case ReflexprExpr::REAK_NamedDecl:
+      E->setArgumentNamedDecl(ReadDeclAs<NamedDecl>(Record, Idx));
+      break;
+    case ReflexprExpr::REAK_TypeInfo:
+      E->setArgumentTypeInfo(GetTypeSourceInfo(Record, Idx));
+      break;
+    case ReflexprExpr::REAK_BaseSpecifier:
+      CXXBaseSpecifier *BaseSpec = new (Reader.getContext()) CXXBaseSpecifier;
+      *BaseSpec = Reader.ReadCXXBaseSpecifier(F, Record, Idx);
+      E->setArgumentBaseSpecifier(BaseSpec);
+      break;
+  }
+  E->setRemoveSugar(Record[Idx++]);
+  E->setHideProtected(Record[Idx++]);
+  E->setHidePrivate(Record[Idx++]);
+  E->setOperatorLoc(ReadSourceLocation(Record, Idx));
+  E->setRParenLoc(ReadSourceLocation(Record, Idx));
+}
+
+void ASTStmtReader::VisitMetaobjectIdExpr(MetaobjectIdExpr *E) {
+  VisitExpr(E);
+  E->setValue(Record[Idx++]);
+  E->setLocation(ReadSourceLocation(Record, Idx));
+}
+
+void ASTStmtReader::VisitUnaryMetaobjectOpExpr(UnaryMetaobjectOpExpr *E) {
+  VisitExpr(E);
+  E->setKind(static_cast<UnaryMetaobjectOp>(Record[Idx++]));
+  E->setResultKind(static_cast<MetaobjectOpResult>(Record[Idx++]));
+  E->setArgumentExpr(Reader.ReadSubExpr());
+  E->setOperatorLoc(ReadSourceLocation(Record, Idx));
+  E->setRParenLoc(ReadSourceLocation(Record, Idx));
+}
+
+void ASTStmtReader::VisitNaryMetaobjectOpExpr(NaryMetaobjectOpExpr *E) {
+  VisitExpr(E);
+  E->setKind(static_cast<NaryMetaobjectOp>(Record[Idx++]));
+  E->setResultKind(static_cast<MetaobjectOpResult>(Record[Idx++]));
+  unsigned Arity = Record[Idx++];
+  for(unsigned i=0; i<Arity; ++i) {
+    E->setArgumentExpr(i, Reader.ReadSubExpr());
+  }
+  E->setOperatorLoc(ReadSourceLocation(Record, Idx));
+  E->setRParenLoc(ReadSourceLocation(Record, Idx));
+}
+
 void ASTStmtReader::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   VisitExpr(E);
   E->setLHS(Reader.ReadSubExpr());
@@ -3094,6 +3151,22 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
         
     case EXPR_SIZEOF_ALIGN_OF:
       S = new (Context) UnaryExprOrTypeTraitExpr(Empty);
+      break;
+
+    case EXPR_REFLEXPR:
+      S = new (Context) ReflexprExpr(Empty);
+      break;
+
+    case EXPR_METAOBJECT_ID:
+      S = new (Context) MetaobjectIdExpr(Empty);
+      break;
+
+    case EXPR_UNARY_METAOBJECT_OP:
+      S = new (Context) UnaryMetaobjectOpExpr(Empty);
+      break;
+
+    case EXPR_NARY_METAOBJECT_OP:
+      S = new (Context) NaryMetaobjectOpExpr(Empty);
       break;
 
     case EXPR_ARRAY_SUBSCRIPT:

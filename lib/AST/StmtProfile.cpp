@@ -829,6 +829,38 @@ StmtProfiler::VisitUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *S) {
     VisitType(S->getArgumentType());
 }
 
+void
+StmtProfiler::VisitReflexprExpr(const ReflexprExpr *S) {
+  // TODO[reflexpr]
+  VisitExpr(S);
+  ID.AddInteger(S->getKind());
+  if (S->isArgumentType())
+    VisitType(S->getArgumentType());
+}
+
+void
+StmtProfiler::VisitMetaobjectIdExpr(const MetaobjectIdExpr *S) {
+  VisitExpr(S);
+  ID.AddInteger(S->getValue());
+}
+
+void
+StmtProfiler::VisitUnaryMetaobjectOpExpr(const UnaryMetaobjectOpExpr *S) {
+  // TODO[reflexpr]
+  VisitExpr(S);
+  ID.AddInteger(S->getKind());
+  ID.AddInteger(S->getResultKind());
+}
+
+void
+StmtProfiler::VisitNaryMetaobjectOpExpr(const NaryMetaobjectOpExpr *S) {
+  // TODO[reflexpr]
+  VisitExpr(S);
+  ID.AddInteger(S->getKind());
+  ID.AddInteger(S->getResultKind());
+  ID.AddInteger(S->getArity());
+}
+
 void StmtProfiler::VisitArraySubscriptExpr(const ArraySubscriptExpr *S) {
   VisitExpr(S);
 }

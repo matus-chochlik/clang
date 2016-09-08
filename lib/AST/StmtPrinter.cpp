@@ -1367,6 +1367,7 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
   case BuiltinType::ULong:     OS << "UL"; break;
   case BuiltinType::LongLong:  OS << "LL"; break;
   case BuiltinType::ULongLong: OS << "ULL"; break;
+  case BuiltinType::MetaobjectId: OS << "MOI"; break;
   }
 }
 
@@ -1497,6 +1498,39 @@ void StmtPrinter::VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *Node){
     OS << " ";
     PrintExpr(Node->getArgumentExpr());
   }
+}
+
+void StmtPrinter::VisitReflexprExpr(ReflexprExpr *Node){
+  // TODO[reflexpr]
+  OS << "__reflexpr";
+  OS << '(';
+  OS << ')';
+}
+
+void StmtPrinter::VisitMetaobjectIdExpr(MetaobjectIdExpr *Node) {
+  OS << "__metaobject_id(";
+  OS << Node->getValue();
+  OS << ')';
+}
+
+void StmtPrinter::VisitUnaryMetaobjectOpExpr(UnaryMetaobjectOpExpr *Node){
+  // TODO[reflexpr]
+  OS << "__metaobj_";
+  OS << '(';
+  PrintExpr(Node->getArgumentExpr());
+  OS << ')';
+}
+
+void StmtPrinter::VisitNaryMetaobjectOpExpr(NaryMetaobjectOpExpr *Node){
+  // TODO[reflexpr]
+  OS << "__metaobj_";
+  OS << '(';
+  PrintExpr(Node->getArgumentExpr(0));
+  for (unsigned i=1; i<Node->getArity(); ++i) {
+    OS << ", ";
+    PrintExpr(Node->getArgumentExpr(i));
+  }
+  OS << ')';
 }
 
 void StmtPrinter::VisitGenericSelectionExpr(GenericSelectionExpr *Node) {

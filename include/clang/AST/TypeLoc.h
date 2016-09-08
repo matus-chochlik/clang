@@ -1746,6 +1746,13 @@ public:
   Expr *getUnderlyingExpr() const { return getTypePtr()->getUnderlyingExpr(); }
 };
 
+class UnrefltypeTypeLoc : public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
+                                                           UnrefltypeTypeLoc,
+                                                           UnrefltypeType> {
+public:
+  Expr *getUnderlyingExpr() const { return getTypePtr()->getUnderlyingExpr(); }
+};
+
 struct UnaryTransformTypeLocInfo {
   // FIXME: While there's only one unary transform right now, future ones may
   // need different representations

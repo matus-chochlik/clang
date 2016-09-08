@@ -537,6 +537,69 @@ void ASTStmtWriter::VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *E) {
   Code = serialization::EXPR_SIZEOF_ALIGN_OF;
 }
 
+void ASTStmtWriter::VisitReflexprExpr(ReflexprExpr *E) {
+  VisitExpr(E);
+  Record.push_back(E->getKind());
+  Record.push_back(E->getSeqKind());
+  Record.push_back(E->getArgKind());
+  switch(E->getArgKind()) {
+    case ReflexprExpr::REAK_Nothing:
+      break;
+    case ReflexprExpr::REAK_Specifier:
+      Record.push_back(E->getArgumentSpecifierKind());
+      break;
+    case ReflexprExpr::REAK_NamedDecl:
+      Record.AddDeclRef(E->getArgumentNamedDecl());
+      break;
+    case ReflexprExpr::REAK_TypeInfo:
+      Record.AddTypeSourceInfo(
+        const_cast<TypeSourceInfo*>(E->getArgumentTypeInfo()));
+      break;
+    case ReflexprExpr::REAK_BaseSpecifier:
+      Record.AddCXXBaseSpecifier(*E->getArgumentBaseSpecifier());
+      break;
+  }
+  Record.push_back(E->getRemoveSugar());
+  Record.push_back(E->getHideProtected());
+  Record.push_back(E->getHidePrivate());
+
+  Record.AddSourceLocation(E->getOperatorLoc());
+  Record.AddSourceLocation(E->getRParenLoc());
+  Code = serialization::EXPR_REFLEXPR;
+}
+
+void ASTStmtWriter::VisitMetaobjectIdExpr(MetaobjectIdExpr *E) {
+  VisitExpr(E);
+  Record.push_back(E->getValue());
+  Record.AddSourceLocation(E->getLocation());
+  Code = serialization::EXPR_METAOBJECT_ID;
+}
+
+void ASTStmtWriter::VisitUnaryMetaobjectOpExpr(UnaryMetaobjectOpExpr *E) {
+  VisitExpr(E);
+  Record.push_back(E->getKind());
+  Record.push_back(E->getResultKind());
+  Record.AddStmt(E->getArgumentExpr());
+  Record.AddSourceLocation(E->getOperatorLoc());
+  Record.AddSourceLocation(E->getRParenLoc());
+  Code = serialization::EXPR_UNARY_METAOBJECT_OP;
+}
+
+void ASTStmtWriter::VisitNaryMetaobjectOpExpr(NaryMetaobjectOpExpr *E) {
+  VisitExpr(E);
+  Record.push_back(E->getKind());
+  Record.push_back(E->getResultKind());
+
+  unsigned Arity = E->getArity();
+  Record.push_back(Arity);
+  for(unsigned i=0; i<Arity; ++i) {
+    Record.AddStmt(E->getArgumentExpr(i));
+  }
+  Record.AddSourceLocation(E->getOperatorLoc());
+  Record.AddSourceLocation(E->getRParenLoc());
+  Code = serialization::EXPR_NARY_METAOBJECT_OP;
+}
+
 void ASTStmtWriter::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   VisitExpr(E);
   Record.AddStmt(E->getLHS());

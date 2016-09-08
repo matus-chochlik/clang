@@ -653,6 +653,7 @@ bool PrintfSpecifier::fixType(QualType QT, const LangOptions &LangOpt,
 
   case BuiltinType::Long:
   case BuiltinType::ULong:
+  case BuiltinType::MetaobjectId:
     LM.setKind(LengthModifier::AsLong);
     break;
 

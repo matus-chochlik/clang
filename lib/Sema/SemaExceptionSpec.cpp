@@ -1155,6 +1155,10 @@ CanThrowResult Sema::canThrow(const Expr *E) {
   case Expr::SubstNonTypeTemplateParmPackExprClass:
   case Expr::FunctionParmPackExprClass:
   case Expr::UnaryExprOrTypeTraitExprClass:
+  case Expr::ReflexprExprClass:
+  case Expr::MetaobjectIdExprClass:
+  case Expr::UnaryMetaobjectOpExprClass:
+  case Expr::NaryMetaobjectOpExprClass:
   case Expr::UnresolvedLookupExprClass:
   case Expr::UnresolvedMemberExprClass:
   case Expr::TypoExprClass:

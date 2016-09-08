@@ -766,11 +766,17 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
     break;
 
   case tok::kw___super:
+  case tok::kw___unrefltype:
   case tok::kw_decltype:
+    if (!getLangOpts().Reflection && Tok.is(tok::kw___unrefltype)) {
+      Diag(Tok, diag::err_using_unrefltype_without_reflection);
+      return ExprError();
+    }
     // Annotate the token and tail recurse.
     if (TryAnnotateTypeOrScopeToken())
       return ExprError();
-    assert(Tok.isNot(tok::kw_decltype) && Tok.isNot(tok::kw___super));
+    assert(Tok.isNot(tok::kw_decltype) && Tok.isNot(tok::kw___super) &&
+           Tok.isNot(tok::kw___unrefltype));
     return ParseCastExpression(isUnaryExpression, isAddressOfOperand);
       
   case tok::identifier: {      // primary-expression: identifier
@@ -1099,6 +1105,26 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   // unary-expression: '__builtin_omp_required_simd_align' '(' type-name ')'
   case tok::kw___builtin_omp_required_simd_align:
     return ParseUnaryExprOrTypeTraitExpression();
+  case tok::kw_reflexpr:
+    if (!getLangOpts().Reflection) {
+      return ExprError(Diag(Tok, diag::err_using_reflexpr_without_reflection));
+    }
+    return ParseReflexprExpression(false);
+  case tok::kw___reflexpr:
+    if (!getLangOpts().Reflection) {
+      return ExprError(Diag(Tok, diag::err_using_reflexpr_without_reflection));
+    }
+    return ParseReflexprExpression(true);
+
+#define METAOBJECT_OP(A,Spelling,R,N,K) case tok::kw___metaobject_ ## Spelling:
+#include "clang/Basic/TokenKinds.def"
+    if (!getLangOpts().Reflection) {
+      Diag(Tok, diag::err_using_metaobject_op_without_reflection)
+        << Tok.getName();
+      return ExprError();
+    }
+    return ParseMetaobjectOperationExpression();
+
   case tok::ampamp: {      // unary-expression: '&&' identifier
     SourceLocation AmpAmpLoc = ConsumeToken();
     if (Tok.isNot(tok::identifier))
@@ -1178,11 +1204,21 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw_typename:
   case tok::kw_typeof:
   case tok::kw___vector:
+  case tok::kw___metaobject_id:
+  case tok::annot___unrefltype:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
   {
     if (!getLangOpts().CPlusPlus) {
       Diag(Tok, diag::err_expected_expression);
+      return ExprError();
+    }
+    if (!getLangOpts().Reflection && Tok.is(tok::kw___metaobject_id)) {
+      Diag(Tok, diag::err_using_metaobject_id_without_reflection);
+      return ExprError();
+    }
+    if (!getLangOpts().Reflection && Tok.is(tok::annot___unrefltype)) {
+      Diag(Tok, diag::err_using_unrefltype_without_reflection);
       return ExprError();
     }
 

@@ -1226,6 +1226,40 @@ createTypePackElementParameterList(const ASTContext &C, DeclContext *DC) {
                                        SourceLocation(), nullptr);
 }
 
+static TemplateParameterList *
+createUnpackMetaobjectSeqParameterList(const ASTContext &C, DeclContext *DC) {
+  // TODO [reflexpr]
+
+  // MetaobjectId ...MOIDs
+  TypeSourceInfo *TI =
+      C.getTrivialTypeSourceInfo(C.getMetaobjectIdType());
+  auto *N = NonTypeTemplateParmDecl::Create(
+      C, DC, SourceLocation(), SourceLocation(), /*Depth=*/0, /*Position=*/0,
+      /*Id=*/nullptr, TI->getType(), /*ParameterPack=*/true, TI);
+  N->setImplicit(true);
+
+  // <MetaobjectId ...MOIDs>
+  NamedDecl *P[1] = {N};
+  auto *TPL = TemplateParameterList::Create(
+      C, SourceLocation(), SourceLocation(), P, SourceLocation(), nullptr);
+
+  // template <...MOIDs> class UnpackSeq
+  auto *TemplateTemplateParm = TemplateTemplateParmDecl::Create(
+      C, DC, SourceLocation(), /*Depth=*/0, /*Position=*/0,
+      /*ParameterPack=*/false, /*Id=*/nullptr, TPL);
+  TemplateTemplateParm->setImplicit(true);
+
+  // MOID
+  auto *NonTypeTemplateParm = NonTypeTemplateParmDecl::Create(
+      C, DC, SourceLocation(), SourceLocation(), /*Depth=*/0, /*Position=*/1,
+      /*Id=*/nullptr, TI->getType(), /*ParameterPack=*/false, TI);
+  NamedDecl *Params[] = {TemplateTemplateParm, NonTypeTemplateParm};
+
+  // template <template <MetaobjectId ...MOIDs> class UnpackSeq, MetaobjectId MOID>
+  return TemplateParameterList::Create(C, SourceLocation(), SourceLocation(),
+                                       Params, SourceLocation(), nullptr);
+}
+
 static TemplateParameterList *createBuiltinTemplateParameterList(
     const ASTContext &C, DeclContext *DC, BuiltinTemplateKind BTK) {
   switch (BTK) {
@@ -1233,6 +1267,8 @@ static TemplateParameterList *createBuiltinTemplateParameterList(
     return createMakeIntegerSeqParameterList(C, DC);
   case BTK__type_pack_element:
     return createTypePackElementParameterList(C, DC);
+  case BTK__unpack_metaobject_seq:
+    return createUnpackMetaobjectSeqParameterList(C, DC);
   }
 
   llvm_unreachable("unhandled BuiltinTemplateKind!");

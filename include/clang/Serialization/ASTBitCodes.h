@@ -799,6 +799,8 @@ namespace clang {
       PREDEF_TYPE_OMP_ARRAY_SECTION = 43,
       /// \brief The '__float128' type
       PREDEF_TYPE_FLOAT128_ID = 44,
+      /// \brief The '__metaobject_id' type
+      PREDEF_TYPE_METAOBJECT_ID_ID = 45,
       /// \brief OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
       PREDEF_TYPE_##Id##_ID,
@@ -904,7 +906,9 @@ namespace clang {
       /// \brief A PipeType record.
       TYPE_PIPE                  = 43,
       /// \brief An ObjCTypeParamType record.
-      TYPE_OBJC_TYPE_PARAM       = 44
+      TYPE_OBJC_TYPE_PARAM       = 44,
+      /// \brief A UnrefltypeType record.
+      TYPE_UNREFLTYPE            = 45
     };
 
     /// \brief The type IDs for special types constructed by semantic
@@ -991,13 +995,16 @@ namespace clang {
 
       /// \brief The internal '__type_pack_element' template.
       PREDEF_DECL_TYPE_PACK_ELEMENT_ID = 16,
+
+      /// \brief The internal '__unpack_metaobject_seq' template.
+      PREDEF_DECL_UNPACK_METAOBJECT_SEQ_ID = 17,
     };
 
     /// \brief The number of declaration IDs that are predefined.
     ///
     /// For more information about predefined declarations, see the
     /// \c PredefinedDeclIDs type and the PREDEF_DECL_*_ID constants.
-    const unsigned int NUM_PREDEF_DECL_IDS = 17;
+    const unsigned int NUM_PREDEF_DECL_IDS = 18;
 
     /// \brief Record of updates for a declaration that was modified after
     /// being deserialized. This can occur within DECLTYPES_BLOCK_ID.
@@ -1262,6 +1269,14 @@ namespace clang {
       EXPR_OFFSETOF,
       /// \brief A SizefAlignOfExpr record.
       EXPR_SIZEOF_ALIGN_OF,
+      /// \brief A Reflexpr record.
+      EXPR_REFLEXPR,
+      /// \brief A MetaobjectId record.
+      EXPR_METAOBJECT_ID,
+      /// \brief A UnaryMetaobjectOp record.
+      EXPR_UNARY_METAOBJECT_OP,
+      /// \brief A NaryMetaobjectOp record.
+      EXPR_NARY_METAOBJECT_OP,
       /// \brief An ArraySubscriptExpr record.
       EXPR_ARRAY_SUBSCRIPT,
       /// \brief A CallExpr record.
