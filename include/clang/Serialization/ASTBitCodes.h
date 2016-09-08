@@ -1011,6 +1011,8 @@ namespace serialization {
       /// \brief The '_Sat unsigned long _Fract' type
       PREDEF_TYPE_SAT_ULONG_FRACT_ID = 69,
 
+      /// \brief The '__metaobject_id' type
+      PREDEF_TYPE_METAOBJECT_ID_ID = 70,
       /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
       PREDEF_TYPE_##Id##_ID,
@@ -1174,7 +1176,10 @@ namespace serialization {
       TYPE_DEPENDENT_ADDRESS_SPACE = 47,
 
       /// A dependentSizedVectorType record.
-      TYPE_DEPENDENT_SIZED_VECTOR = 48
+      TYPE_DEPENDENT_SIZED_VECTOR = 48,
+
+      /// A UnrefltypeType record.
+      TYPE_UNREFLTYPE            = 49
     };
 
     /// The type IDs for special types constructed by semantic
@@ -1268,13 +1273,16 @@ namespace serialization {
 
       /// The internal '__type_pack_element' template.
       PREDEF_DECL_TYPE_PACK_ELEMENT_ID = 16,
+
+      /// \brief The internal '__unpack_metaobject_seq' template.
+      PREDEF_DECL_UNPACK_METAOBJECT_SEQ_ID = 17,
     };
 
     /// The number of declaration IDs that are predefined.
     ///
     /// For more information about predefined declarations, see the
     /// \c PredefinedDeclIDs type and the PREDEF_DECL_*_ID constants.
-    const unsigned int NUM_PREDEF_DECL_IDS = 17;
+    const unsigned int NUM_PREDEF_DECL_IDS = 18;
 
     /// Record of updates for a declaration that was modified after
     /// being deserialized. This can occur within DECLTYPES_BLOCK_ID.
@@ -1660,7 +1668,14 @@ namespace serialization {
 
       /// A SizefAlignOfExpr record.
       EXPR_SIZEOF_ALIGN_OF,
-
+      /// \brief A Reflexpr record.
+      EXPR_REFLEXPR,
+      /// \brief A MetaobjectId record.
+      EXPR_METAOBJECT_ID,
+      /// \brief A UnaryMetaobjectOp record.
+      EXPR_UNARY_METAOBJECT_OP,
+      /// \brief A NaryMetaobjectOp record.
+      EXPR_NARY_METAOBJECT_OP,
       /// An ArraySubscriptExpr record.
       EXPR_ARRAY_SUBSCRIPT,
 

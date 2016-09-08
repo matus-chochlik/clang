@@ -2790,7 +2790,7 @@ Parser::DiagnoseMissingSemiAfterTagDefinition(DeclSpec &DS, AccessSpecifier AS,
 
   if (getLangOpts().CPlusPlus &&
       Tok.isOneOf(tok::identifier, tok::coloncolon, tok::kw_decltype,
-                  tok::annot_template_id) &&
+                  tok::kw___unrefltype, tok::annot_template_id) &&
       TryAnnotateCXXScopeToken(EnteringContext)) {
     SkipMalformedDecl();
     return true;
@@ -3189,8 +3189,14 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
 
       // typedef-name
     case tok::kw___super:
+    case tok::kw___unrefltype:
     case tok::kw_decltype:
     case tok::identifier: {
+      if (!getLangOpts().Reflection && Tok.is(tok::kw___unrefltype)) {
+        Diag(Tok, diag::err_using_unrefltype_without_reflection);
+        isInvalid = true;
+        break;
+      }
       // This identifier can only be a typedef name if we haven't already seen
       // a type-specifier.  Without this check we misparse:
       //  typedef int X; struct Y { short X; };  as 'short int'.
@@ -3638,6 +3644,16 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       isInvalid = DS.SetTypeSpecType(DeclSpec::TST_char32, Loc, PrevSpec,
                                      DiagID, Policy);
       break;
+    case tok::kw___metaobject_id:
+      if (Actions.getLangOpts().Reflection) {
+        isInvalid = DS.SetTypeSpecType(DeclSpec::TST_metaobject_id, Loc,
+                                       PrevSpec, DiagID, Policy);
+      } else {
+        DiagID = diag::err_using_metaobject_id_without_reflection;
+        PrevSpec = Tok.getIdentifierInfo()->getNameStart();
+        isInvalid = true;
+      }
+      break;
     case tok::kw_bool:
     case tok::kw__Bool:
       if (Tok.is(tok::kw_bool) &&
@@ -3755,6 +3771,10 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
 
     case tok::annot_decltype:
       ParseDecltypeSpecifier(DS);
+      continue;
+
+    case tok::annot___unrefltype:
+      ParseUnrefltypeSpecifier(DS);
       continue;
 
     case tok::annot_pragma_pack:
@@ -4649,6 +4669,7 @@ bool Parser::isKnownToBeTypeSpecifier(const Token &Tok) const {
   case tok::kw__Decimal64:
   case tok::kw__Decimal128:
   case tok::kw___vector:
+  case tok::kw___metaobject_id:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
 
@@ -4728,6 +4749,7 @@ bool Parser::isTypeSpecifierQualifier() {
   case tok::kw__Decimal64:
   case tok::kw__Decimal128:
   case tok::kw___vector:
+  case tok::kw___metaobject_id:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
 
@@ -4814,6 +4836,7 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
   case tok::kw_typename: // typename T::type
     // Annotate typenames and C++ scope specifiers.  If we get one, just
     // recurse to handle whatever we get.
+  case tok::kw___unrefltype: // __unrefltype(__reflexpr(T))::type
     if (TryAnnotateTypeOrScopeToken())
       return true;
     if (Tok.is(tok::identifier))
@@ -4889,6 +4912,7 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
   case tok::kw__Decimal64:
   case tok::kw__Decimal128:
   case tok::kw___vector:
+  case tok::kw___metaobject_id:
 
     // struct-or-union-specifier (C99) or class-specifier (C++)
   case tok::kw_class:
@@ -4928,6 +4952,9 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
     // C++11 decltype and constexpr.
   case tok::annot_decltype:
   case tok::kw_constexpr:
+
+    // Reflection __unrefltype
+  case tok::annot___unrefltype:
 
     // C11 _Atomic
   case tok::kw__Atomic:

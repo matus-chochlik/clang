@@ -1627,6 +1627,7 @@ void Preprocessor::ExpandBuiltinMacro(Token &Tok) {
                       .Case("__make_integer_seq", LangOpts.CPlusPlus)
                       .Case("__type_pack_element", LangOpts.CPlusPlus)
                       .Case("__builtin_available", true)
+                      .Case("__unpack_metaobject_seq", LangOpts.CPlusPlus)
                       .Case("__is_target_arch", true)
                       .Case("__is_target_vendor", true)
                       .Case("__is_target_os", true)

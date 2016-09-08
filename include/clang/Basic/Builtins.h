@@ -47,7 +47,7 @@ enum LanguageID {
 
 namespace Builtin {
 enum ID {
-  NotBuiltin  = 0,      // This is not a builtin function.
+  NotBuiltin = 0, // This is not a builtin function.
 #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
 #include "clang/Basic/Builtins.def"
   FirstTSBuiltin
@@ -79,23 +79,17 @@ public:
   /// Mark the identifiers for all the builtins with their
   /// appropriate builtin ID # and mark any non-portable builtin identifiers as
   /// such.
-  void initializeBuiltins(IdentifierTable &Table, const LangOptions& LangOpts);
+  void initializeBuiltins(IdentifierTable &Table, const LangOptions &LangOpts);
 
   /// Return the identifier name for the specified builtin,
   /// e.g. "__builtin_abs".
-  const char *getName(unsigned ID) const {
-    return getRecord(ID).Name;
-  }
+  const char *getName(unsigned ID) const { return getRecord(ID).Name; }
 
   /// Get the type descriptor string for the specified builtin.
-  const char *getTypeString(unsigned ID) const {
-    return getRecord(ID).Type;
-  }
+  const char *getTypeString(unsigned ID) const { return getRecord(ID).Type; }
 
   /// Return true if this function is a target-specific builtin.
-  bool isTSBuiltin(unsigned ID) const {
-    return ID >= Builtin::FirstTSBuiltin;
-  }
+  bool isTSBuiltin(unsigned ID) const { return ID >= Builtin::FirstTSBuiltin; }
 
   /// Return true if this function has no side effects.
   bool isPure(unsigned ID) const {
@@ -143,8 +137,8 @@ public:
   }
 
   /// Returns true if this builtin requires appropriate header in other
-  /// compilers. In Clang it will work even without including it, but we can emit
-  /// a warning about missing header.
+  /// compilers. In Clang it will work even without including it, but we can
+  /// emit a warning about missing header.
   bool isHeaderDependentFunction(unsigned ID) const {
     return strchr(getRecord(ID).Attributes, 'h') != nullptr;
   }
@@ -237,7 +231,7 @@ private:
               const char *Fmt) const;
 };
 
-}
+} // namespace Builtin
 
 /// Kinds of BuiltinTemplateDecl.
 enum BuiltinTemplateKind : int {
@@ -245,7 +239,10 @@ enum BuiltinTemplateKind : int {
   BTK__make_integer_seq,
 
   /// This names the __type_pack_element BuiltinTemplateDecl.
-  BTK__type_pack_element
+  BTK__type_pack_element,
+
+  /// This names the __unpack_metaobject_seq BuiltinTemplateDecl.
+  BTK__unpack_metaobject_seq
 };
 
 } // end namespace clang

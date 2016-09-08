@@ -96,6 +96,11 @@ def PseudoObjectExpr : DStmt<Expr>;
 // Wrapper expressions
 def FullExpr : DStmt<Expr, 1>;
 def ConstantExpr : DStmt<FullExpr>;
+// C++ reflection expressions / statements
+def ReflexprExpr : DStmt<Expr>;
+def MetaobjectIdExpr : DStmt<Expr>;
+def UnaryMetaobjectOpExpr : DStmt<Expr>;
+def NaryMetaobjectOpExpr : DStmt<Expr>;
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;

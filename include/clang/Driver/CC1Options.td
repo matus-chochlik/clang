@@ -761,6 +761,9 @@ def fobjc_gc_only : Flag<["-"], "fobjc-gc-only">, Group<f_Group>,
   HelpText<"Use GC exclusively for Objective-C related memory management">;
 def fobjc_gc : Flag<["-"], "fobjc-gc">, Group<f_Group>,
   HelpText<"Enable Objective-C garbage collection">;
+// Reflection
+def freflection : Flag<["-"], "freflection">,
+  HelpText<"Enable support for the C++ Reflection">;
 
 //===----------------------------------------------------------------------===//
 // Header Search Options

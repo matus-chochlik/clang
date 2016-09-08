@@ -2141,6 +2141,7 @@ void CodeGenFunction::EmitVariablyModifiedType(QualType type) {
 
     case Type::Typedef:
     case Type::Decltype:
+    case Type::Unrefltype:
     case Type::Auto:
     case Type::DeducedTemplateSpecialization:
       // Stop walking: nothing to do.

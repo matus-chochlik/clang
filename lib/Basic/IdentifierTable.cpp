@@ -100,6 +100,7 @@ namespace {
     KEYMODULES    = 0x100000,
     KEYCXX2A      = 0x200000,
     KEYOPENCLCXX  = 0x400000,
+    KEYREFLECTION = 0x800000,
     KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX2A,
     KEYALL = (0xffffff & ~KEYNOMS18 &
               ~KEYNOOPENCL) // KEYNOMS18 and KEYNOOPENCL are used to exclude.
@@ -144,6 +145,8 @@ static KeywordStatus getKeywordStatus(const LangOptions &LangOpts,
   if (LangOpts.ConceptsTS && (Flags & KEYCONCEPTS)) return KS_Enabled;
   if (LangOpts.CoroutinesTS && (Flags & KEYCOROUTINES)) return KS_Enabled;
   if (LangOpts.ModulesTS && (Flags & KEYMODULES)) return KS_Enabled;
+  if (LangOpts.Reflection && (Flags & KEYREFLECTION)) return KS_Enabled;
+  if (Flags & KEYREFLECTION) return KS_Extension; // TODO[reflexpr]
   if (LangOpts.CPlusPlus && (Flags & KEYALLCXX)) return KS_Future;
   return KS_Disabled;
 }

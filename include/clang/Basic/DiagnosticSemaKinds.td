@@ -9253,6 +9253,19 @@ def note_await_ready_no_bool_conversion : Note<
 >;
 }
 
+let CategoryName = "Reflection Issue" in {
+def err_expected_metaobject_id_expr : Error<
+  "metaobject-id expression expected">;
+def err_metaobject_operation_not_applicable : Error<
+  "operation '%0' not applicable to a metaobject reflecting %1">;
+def err_unrefltype_operator_not_applicable_to_metaobject : Error<
+  "__unrefltype operator not applicable to a metaobject reflecting %0">;
+def err_unrefltype_operator_not_applicable_to_operation : Error<
+  "__unrefltype operator not applicable to operation %0">;
+def err_unpack_metaobject_seq_not_applicable : Error<
+  "__unpack_metaobject_seq not applicable to a metaobject reflecting %0">;
+}
+
 let CategoryName = "Documentation Issue" in {
 def warn_not_a_doxygen_trailing_member_comment : Warning<
   "not a Doxygen trailing comment">, InGroup<Documentation>, DefaultIgnore;
