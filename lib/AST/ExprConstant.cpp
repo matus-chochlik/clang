@@ -3200,6 +3200,8 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         return CompleteObject();
       } else if (VD->isConstexpr()) {
         // OK, we can read this variable.
+      } else if (BaseType->isMetaobjectIdType()) {
+
       } else if (BaseType->isIntegralOrEnumerationType()) {
         // In OpenCL if a variable is in constant address space it is a const value.
         if (!(BaseType.isConstQualified() ||
@@ -4978,6 +4980,9 @@ public:
     return DerivedZeroInitialization(E);
   }
   bool VisitCXXNullPtrLiteralExpr(const CXXNullPtrLiteralExpr *E) {
+    return DerivedZeroInitialization(E);
+  }
+  bool VisitMetaobjectIdExpr(const MetaobjectIdExpr *E) {
     return DerivedZeroInitialization(E);
   }
 
@@ -7281,7 +7286,8 @@ public:
       : ExprEvaluatorBaseTy(info), Result(result) {}
 
   bool Success(const llvm::APSInt &SI, const Expr *E, APValue &Result) {
-    assert(E->getType()->isIntegralOrEnumerationType() &&
+    assert((E->getType()->isIntegralOrEnumerationType() ||
+            E->getType()->isMetaobjectIdType()) &&
            "Invalid evaluation result.");
     assert(SI.isSigned() == E->getType()->isSignedIntegerOrEnumerationType() &&
            "Invalid evaluation result.");
@@ -7295,7 +7301,7 @@ public:
   }
 
   bool Success(const llvm::APInt &I, const Expr *E, APValue &Result) {
-    assert(E->getType()->isIntegralOrEnumerationType() &&
+    assert((E->getType()->isIntegralOrEnumerationType() || E->getType()->isMetaobjectIdType()) &&
            "Invalid evaluation result.");
     assert(I.getBitWidth() == Info.Ctx.getIntWidth(E->getType()) &&
            "Invalid evaluation result.");
@@ -7309,7 +7315,8 @@ public:
   }
 
   bool Success(uint64_t Value, const Expr *E, APValue &Result) {
-    assert(E->getType()->isIntegralOrEnumerationType() &&
+    assert((E->getType()->isIntegralOrEnumerationType() ||
+            E->getType()->isMetaobjectIdType()) &&
            "Invalid evaluation result.");
     Result = APValue(Info.Ctx.MakeIntValue(Value, E->getType()));
     return true;
@@ -7367,6 +7374,13 @@ public:
 
   bool VisitCastExpr(const CastExpr* E);
   bool VisitUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *E);
+
+  bool VisitReflexprExpr(const ReflexprExpr *E);
+  bool VisitMetaobjectIdExpr(const MetaobjectIdExpr *E) {
+    return Success(E->getValue(), E);
+  }
+  bool VisitUnaryMetaobjectOpExpr(const UnaryMetaobjectOpExpr *E);
+  bool VisitNaryMetaobjectOpExpr(const NaryMetaobjectOpExpr *E);
 
   bool VisitCXXBoolLiteralExpr(const CXXBoolLiteralExpr *E) {
     return Success(E->getValue(), E);
@@ -7626,6 +7640,8 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
     case BuiltinType::SatUFract:
     case BuiltinType::SatULongFract:
       return GCCTypeClass::None;
+    case BuiltinType::MetaobjectId:
+      return integer_type_class;
 
     case BuiltinType::NullPtr:
 
@@ -9411,6 +9427,31 @@ bool IntExprEvaluator::VisitUnaryExprOrTypeTraitExpr(
 
   llvm_unreachable("unknown expr/type trait");
 }
+//
+/// VisitReflexprExpr - Evaluate a __reflexpr
+bool IntExprEvaluator::VisitReflexprExpr(const ReflexprExpr *E) {
+
+  return Success(E->getIdValue(Info.Ctx), E);
+}
+//
+/// VisitUnaryMetaobjectOpExpr - Evaluate a __metaobject_{operation}
+bool
+IntExprEvaluator::VisitUnaryMetaobjectOpExpr(const UnaryMetaobjectOpExpr *E) {
+
+  if(E->hasIntResult()) {
+    return Success(E->getIntResult(Info.Ctx), E);
+  }
+  return false;
+}
+/// VisitNaryMetaobjectOpExpr - Evaluate a __metaobject_{operation}
+bool
+IntExprEvaluator::VisitNaryMetaobjectOpExpr(const NaryMetaobjectOpExpr *E) {
+
+  if(E->hasIntResult()) {
+    return Success(E->getIntResult(Info.Ctx), E);
+  }
+  return false;
+}
 
 bool IntExprEvaluator::VisitOffsetOfExpr(const OffsetOfExpr *OOE) {
   CharUnits Result;
@@ -10570,6 +10611,10 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
   } else if (T->isIntegralOrEnumerationType()) {
     if (!IntExprEvaluator(Info, Result).Visit(E))
       return false;
+  } else if (T->isMetaobjectIdType()) {
+    // TODO[reflexpr]
+    if (!IntExprEvaluator(Info, Result).Visit(E))
+      return false;
   } else if (T->hasPointerRepresentation()) {
     LValue LV;
     if (!EvaluatePointer(E, LV, Info))
@@ -10959,6 +11004,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::MSPropertyRefExprClass:
   case Expr::MSPropertySubscriptExprClass:
   case Expr::CXXNullPtrLiteralExprClass:
+  case Expr::MetaobjectIdExprClass:
   case Expr::UserDefinedLiteralClass:
   case Expr::CXXThisExprClass:
   case Expr::CXXThrowExprClass:
@@ -11128,6 +11174,12 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
       return ICEDiag(IK_NotICE, E->getBeginLoc());
     return NoDiag();
   }
+  case Expr::ReflexprExprClass:
+    return CheckEvalInICE(E, Ctx);
+  case Expr::UnaryMetaobjectOpExprClass:
+  case Expr::NaryMetaobjectOpExprClass:
+    // TODO[reflexpr]
+    return CheckEvalInICE(E, Ctx);
   case Expr::BinaryOperatorClass: {
     const BinaryOperator *Exp = cast<BinaryOperator>(E);
     switch (Exp->getOpcode()) {
@@ -11341,6 +11393,28 @@ bool Expr::isIntegerConstantExpr(const ASTContext &Ctx,
     if (Loc) *Loc = D.Loc;
     return false;
   }
+  return true;
+}
+
+bool Expr::isMetaobjectIdExpr(llvm::APSInt &Value, const ASTContext &Ctx,
+                              SourceLocation *Loc, bool isEvaluated) const {
+  assert(Ctx.getLangOpts().Reflection);
+
+  if (!getType()->isMetaobjectIdType()) {
+    if (Loc) *Loc = getExprLoc();
+    return false;
+  }
+
+  APValue Result;
+  if (!isCXX11ConstantExpr(Ctx, &Result, Loc))
+    return false;
+
+  if (!Result.isInt()) {
+    if (Loc) *Loc = getExprLoc();
+    return false;
+  }
+
+  Value = Result.getInt();
   return true;
 }
 

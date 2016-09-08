@@ -982,6 +982,7 @@ public:
   TRIVIAL_TYPE_CLASS(TypeOfExpr)
   TRIVIAL_TYPE_CLASS(TypeOf)
   TRIVIAL_TYPE_CLASS(Decltype)
+  TRIVIAL_TYPE_CLASS(Unrefltype)
   TRIVIAL_TYPE_CLASS(UnaryTransform)
   TRIVIAL_TYPE_CLASS(Record)
   TRIVIAL_TYPE_CLASS(Enum)
@@ -1773,6 +1774,13 @@ bool Type::isIntegralOrUnscopedEnumerationType() const {
   if (const auto *ET = dyn_cast<EnumType>(CanonicalType))
     return ET->getDecl()->isComplete() && !ET->getDecl()->isScoped();
 
+  return false;
+}
+
+bool Type::isMetaobjectIdType() const {
+  if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
+    return BT->getKind() == BuiltinType::MetaobjectId;
+  }
   return false;
 }
 
@@ -2747,6 +2755,8 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "char16_t";
   case Char32:
     return "char32_t";
+  case MetaobjectId:
+    return "__metaobject_id";
   case NullPtr:
     return "nullptr_t";
   case Overload:
@@ -3099,6 +3109,35 @@ DependentDecltypeType::DependentDecltypeType(const ASTContext &Context, Expr *E)
     : DecltypeType(E, Context.DependentTy), Context(Context) {}
 
 void DependentDecltypeType::Profile(llvm::FoldingSetNodeID &ID,
+                                    const ASTContext &Context, Expr *E) {
+  E->Profile(ID, Context, true);
+}
+
+UnrefltypeType::UnrefltypeType(Expr *E, QualType underlyingType, QualType can)
+  : Type(Unrefltype, can, E->isInstantiationDependent(),
+         E->isInstantiationDependent(),
+         E->getType()->isVariablyModifiedType(),// TODO[reflexpr] is this right?
+         E->containsUnexpandedParameterPack()),
+    E(E),
+  UnderlyingType(underlyingType) {
+}
+
+bool UnrefltypeType::isSugared() const {
+  return !E->isInstantiationDependent();
+}
+
+QualType UnrefltypeType::desugar() const {
+  if (isSugared())
+    return getUnderlyingType();
+
+  return QualType(this, 0);
+}
+
+DependentUnrefltypeType::DependentUnrefltypeType(const ASTContext &Context,
+                                                 Expr *E)
+  : UnrefltypeType(E, Context.DependentTy), Context(Context) { }
+
+void DependentUnrefltypeType::Profile(llvm::FoldingSetNodeID &ID,
                                     const ASTContext &Context, Expr *E) {
   E->Profile(ID, Context, true);
 }
@@ -3690,6 +3729,7 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::TypeOfExpr:
   case Type::TypeOf:
   case Type::Decltype:
+  case Type::Unrefltype:
   case Type::UnaryTransform:
   case Type::TemplateTypeParm:
   case Type::SubstTemplateTypeParmPack:

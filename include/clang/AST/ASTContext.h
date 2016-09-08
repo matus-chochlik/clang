@@ -194,6 +194,7 @@ private:
     FunctionProtoTypes;
   mutable llvm::FoldingSet<DependentTypeOfExprType> DependentTypeOfExprTypes;
   mutable llvm::FoldingSet<DependentDecltypeType> DependentDecltypeTypes;
+  mutable llvm::FoldingSet<DependentUnrefltypeType> DependentUnrefltypeTypes;
   mutable llvm::FoldingSet<TemplateTypeParmType> TemplateTypeParmTypes;
   mutable llvm::FoldingSet<ObjCTypeParamType> ObjCTypeParamTypes;
   mutable llvm::FoldingSet<SubstTemplateTypeParmType>
@@ -242,8 +243,19 @@ private:
   mutable llvm::DenseMap<const ObjCContainerDecl*, const ASTRecordLayout*>
     ObjCLayouts;
 
+
   /// A cache from types to size and alignment information.
   using TypeInfoMap = llvm::DenseMap<const Type *, struct TypeInfo>;
+
+  // -- Reflection --
+  uintptr_t MetaobjectEncodingKey;
+  ReflexprExpr* GlobalScopeReflexpr;
+  ReflexprExpr* NoSpecifierReflexpr;
+  typedef llvm::DenseMap<unsigned, ReflexprExpr*> SpecifierReflexprMap;
+  SpecifierReflexprMap SpecifierReflexprs;
+  typedef llvm::DenseMap<const NamedDecl*, ReflexprExpr*> NamedDeclReflexprMap;
+  NamedDeclReflexprMap NamedDeclReflexprs;
+
   mutable TypeInfoMap MemoizedTypeInfo;
 
   /// A cache from types to unadjusted alignment information. Only ARM and
@@ -346,6 +358,9 @@ private:
 
   /// The identifier '__type_pack_element'.
   mutable IdentifierInfo *TypePackElementName = nullptr;
+
+  /// The identifier '__unpack_metaobject_seq'.
+  mutable IdentifierInfo *UnpackMetaobjectSeqName = nullptr;
 
   QualType ObjCConstantStringType;
   mutable RecordDecl *CFConstantStringTagDecl = nullptr;
@@ -521,6 +536,7 @@ private:
   mutable ExternCContextDecl *ExternCContext = nullptr;
   mutable BuiltinTemplateDecl *MakeIntegerSeqDecl = nullptr;
   mutable BuiltinTemplateDecl *TypePackElementDecl = nullptr;
+  mutable BuiltinTemplateDecl *UnpackMetaobjectSeqDecl = nullptr;     
 
   /// The associated SourceManager object.
   SourceManager &SourceMgr;
@@ -1020,6 +1036,7 @@ public:
   ExternCContextDecl *getExternCContextDecl() const;
   BuiltinTemplateDecl *getMakeIntegerSeqDecl() const;
   BuiltinTemplateDecl *getTypePackElementDecl() const;
+  BuiltinTemplateDecl *getUnpackMetaobjectSeqDecl() const;
 
   // Builtin Types.
   CanQualType VoidTy;
@@ -1051,6 +1068,7 @@ public:
   CanQualType FloatComplexTy, DoubleComplexTy, LongDoubleComplexTy;
   CanQualType Float128ComplexTy;
   CanQualType VoidPtrTy, NullPtrTy;
+  CanQualType MetaobjectIdTy;
   CanQualType DependentTy, OverloadTy, BoundMemberTy, UnknownAnyTy;
   CanQualType BuiltinFnTy;
   CanQualType PseudoObjectTy, ARCUnbridgedCastTy;
@@ -1520,6 +1538,9 @@ public:
   /// C++11 decltype.
   QualType getDecltypeType(Expr *e, QualType UnderlyingType) const;
 
+  /// \brief Reflection __unrefltype.
+  QualType getUnrefltypeType(Expr *e, QualType UnderlyingType) const;
+
   /// Unary type transforms
   QualType getUnaryTransformType(QualType BaseType, QualType UnderlyingType,
                                  UnaryTransformType::UTTKind UKind) const;
@@ -1542,6 +1563,12 @@ public:
   /// Return the unique reference to the type for the specified TagDecl
   /// (struct/union/class/enum) decl.
   QualType getTagDeclType(const TagDecl *Decl) const;
+
+
+  /// \brief Return the unique type for "__metaobject_id"
+  ///
+  /// The __reflexpr operator requires this
+  CanQualType getMetaobjectIdType() const;
 
   /// Return the unique type for "size_t" (C99 7.17), defined in
   /// <stddef.h>.
@@ -1729,6 +1756,12 @@ public:
     if (!TypePackElementName)
       TypePackElementName = &Idents.get("__type_pack_element");
     return TypePackElementName;
+  }
+
+  IdentifierInfo *getUnpackMetaobjectSeqName() const {
+    if (!UnpackMetaobjectSeqName)
+      UnpackMetaobjectSeqName = &Idents.get("__unpack_metaobject_seq");
+    return UnpackMetaobjectSeqName;
   }
 
   /// Retrieve the Objective-C "instancetype" type, if already known;
@@ -2056,6 +2089,28 @@ public:
   static bool isObjCNSObjectType(QualType Ty) {
     return Ty->isObjCNSObjectType();
   }
+  //===--------------------------------------------------------------------===//
+  //                                Reflection
+  //===--------------------------------------------------------------------===//
+
+  uintptr_t makeMetaobjectKey() const;
+  uintptr_t encodeMetaobjectId(uintptr_t unencoded);
+  uintptr_t decodeMetaobjectId(uintptr_t encoded);
+  ReflexprExpr* cacheGlobalScopeReflexpr(ReflexprExpr* E);
+  ReflexprExpr* findGlobalScopeReflexpr(void) const {
+    return GlobalScopeReflexpr;
+  }
+  ReflexprExpr* cacheNoSpecifierReflexpr(ReflexprExpr* E) {
+    NoSpecifierReflexpr = E;
+    return NoSpecifierReflexpr;
+  }
+  ReflexprExpr* findNoSpecifierReflexpr(void) const {
+    return NoSpecifierReflexpr;
+  }
+  ReflexprExpr* cacheSpecifierReflexpr(tok::TokenKind K, ReflexprExpr* E);
+  ReflexprExpr* findSpecifierReflexpr(tok::TokenKind K) const;
+  ReflexprExpr* cacheNamedDeclReflexpr(const NamedDecl* ND, ReflexprExpr* E);
+  ReflexprExpr* findNamedDeclReflexpr(const NamedDecl* ND) const;
 
   //===--------------------------------------------------------------------===//
   //                         Type Sizing and Analysis

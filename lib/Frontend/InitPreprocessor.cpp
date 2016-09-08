@@ -567,6 +567,8 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
   // Potential future breaking changes.
   if (LangOpts.Char8)
     Builder.defineMacro("__cpp_char8_t", "201803L");
+  if (LangOpts.Reflection)
+    Builder.defineMacro("__cpp_reflection", "1");
 }
 
 static void InitializePredefinedMacros(const TargetInfo &TI,

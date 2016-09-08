@@ -368,6 +368,7 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::SatUShortFract:
   case BuiltinType::SatUFract:
   case BuiltinType::SatULongFract:
+  case BuiltinType::MetaobjectId:
     llvm_unreachable("Builtin type needs extra local data!");
     // Fall through, if the impossible happens.
 

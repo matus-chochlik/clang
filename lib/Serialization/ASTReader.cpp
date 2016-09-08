@@ -6111,6 +6111,11 @@ QualType ASTReader::readTypeRecord(unsigned Index) {
     return Context.getDecltypeType(ReadExpr(*Loc.F), UnderlyingType);
   }
 
+  case TYPE_UNREFLTYPE: {
+    QualType UnderlyingType = readType(*Loc.F, Record, Idx);
+    return Context.getUnrefltypeType(ReadExpr(*Loc.F), UnderlyingType);
+  }
+
   case TYPE_UNARY_TRANSFORM: {
     QualType BaseType = readType(*Loc.F, Record, Idx);
     QualType UnderlyingType = readType(*Loc.F, Record, Idx);
@@ -6617,7 +6622,9 @@ void TypeLocReader::VisitTypeOfTypeLoc(TypeOfTypeLoc TL) {
 void TypeLocReader::VisitDecltypeTypeLoc(DecltypeTypeLoc TL) {
   TL.setNameLoc(ReadSourceLocation());
 }
-
+void TypeLocReader::VisitUnrefltypeTypeLoc(UnrefltypeTypeLoc TL) {
+  TL.setNameLoc(ReadSourceLocation());
+}
 void TypeLocReader::VisitUnaryTransformTypeLoc(UnaryTransformTypeLoc TL) {
   TL.setKWLoc(ReadSourceLocation());
   TL.setLParenLoc(ReadSourceLocation());
@@ -6921,6 +6928,9 @@ QualType ASTReader::GetType(TypeID ID) {
       break;
     case PREDEF_TYPE_FLOAT128_ID:
       T = Context.Float128Ty;
+      break;
+    case PREDEF_TYPE_METAOBJECT_ID_ID:
+      T = Context.MetaobjectIdTy;
       break;
     case PREDEF_TYPE_OVERLOAD_ID:
       T = Context.OverloadTy;
@@ -7306,6 +7316,9 @@ static Decl *getPredefinedDecl(ASTContext &Context, PredefinedDeclIDs ID) {
 
   case PREDEF_DECL_TYPE_PACK_ELEMENT_ID:
     return Context.getTypePackElementDecl();
+
+  case PREDEF_DECL_UNPACK_METAOBJECT_SEQ_ID:
+    return Context.getUnpackMetaobjectSeqDecl();
   }
   llvm_unreachable("PredefinedDeclIDs unknown enum value");
 }

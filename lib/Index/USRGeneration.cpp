@@ -661,6 +661,7 @@ void USRGenerator::VisitType(QualType T) {
         case BuiltinType::UInt:
           c = 'i'; break;
         case BuiltinType::ULong:
+        case BuiltinType::MetaobjectId:
           c = 'l'; break;
         case BuiltinType::ULongLong:
           c = 'k'; break;

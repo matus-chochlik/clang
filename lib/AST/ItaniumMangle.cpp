@@ -1976,6 +1976,7 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   case Type::TypeOfExpr:
   case Type::TypeOf:
   case Type::Decltype:
+  case Type::Unrefltype:
   case Type::TemplateTypeParm:
   case Type::UnaryTransform:
   case Type::SubstTemplateTypeParm:
@@ -2525,6 +2526,9 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
   case BuiltinType::ULong:
     Out << 'm';
     break;
+  case BuiltinType::MetaobjectId:
+    Out << "mo";
+    break;
   case BuiltinType::ULongLong:
     Out << 'y';
     break;
@@ -3047,6 +3051,7 @@ static StringRef mangleAArch64VectorBase(const BuiltinType *EltType) {
     return "Float32";
   case BuiltinType::Double:
     return "Float64";
+  case BuiltinType::MetaobjectId:
   default:
     llvm_unreachable("Unexpected vector element base type");
   }
@@ -3078,6 +3083,7 @@ void CXXNameMangler::mangleAArch64NeonVectorType(const VectorType *T) {
     case BuiltinType::ULongLong:
       EltName = "Poly64";
       break;
+    case BuiltinType::MetaobjectId:
     default:
       llvm_unreachable("unexpected Neon polynomial vector element type");
     }
@@ -3317,6 +3323,15 @@ void CXXNameMangler::mangleType(const DecltypeType *T) {
     Out << "Dt";
   else
     Out << "DT";
+  mangleExpression(E);
+  Out << 'E';
+}
+
+void CXXNameMangler::mangleType(const UnrefltypeType *T) {
+  Expr *E = T->getUnderlyingExpr();
+
+  // TODO[reflexpr] is this OK?
+  Out << "UT";
   mangleExpression(E);
   Out << 'E';
 }
@@ -3906,6 +3921,30 @@ recurse:
       Out << 'z';
       mangleExpression(SAE->getArgumentExpr());
     }
+    break;
+  }
+
+  case Expr::ReflexprExprClass: {
+    // TODO[reflexpr] is this OK?
+    Out << "mo";
+    break;
+  }
+
+  case Expr::MetaobjectIdExprClass: {
+    // TODO[reflexpr] is this OK?
+    Out << "ma";
+    break;
+  }
+
+  case Expr::UnaryMetaobjectOpExprClass: {
+    // TODO[reflexpr] is this OK?
+    Out << "mp";
+    break;
+  }
+
+  case Expr::NaryMetaobjectOpExprClass: {
+    // TODO[reflexpr] is this OK?
+    Out << "mp";
     break;
   }
 
