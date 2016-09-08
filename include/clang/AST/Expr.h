@@ -478,6 +478,12 @@ public:
   /// C.
   bool isKnownToHaveBooleanValue() const;
 
+
+  // TODO[reflexpr] document this
+  bool isMetaobjectIdExpr(llvm::APSInt &Result, const ASTContext &Ctx,
+                          SourceLocation *Loc = nullptr,
+                          bool isEvaluated = true) const;
+
   /// isIntegerConstantExpr - Return true if this expression is a valid integer
   /// constant expression, and, if so, return its value in Result.  If not a
   /// valid i-c-e, return false and fill in Loc (if specified) with the location

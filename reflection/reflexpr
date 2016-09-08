@@ -1,0 +1,494 @@
+#ifndef __REFLEXPR_HEADER__
+#define __REFLEXPR_HEADER__
+#if __cpp_reflection
+#include <type_traits>
+
+namespace std {
+
+// Helpers
+
+template <__metaobject_id MoId>
+struct __metaobject { };
+
+template <typename T>
+struct is_metaobject
+ : false_type { };
+
+template <__metaobject_id MoId>
+struct is_metaobject<__metaobject<MoId>> : true_type { };
+
+template <typename T>
+constexpr bool is_metaobject_v = is_metaobject<T>::value;
+
+namespace meta {
+
+template <typename T>
+struct __unwrap_id;
+
+template <__metaobject_id MoId>
+struct __unwrap_id<__metaobject<MoId>>
+{
+	static constexpr __metaobject_id value = MoId;
+};
+
+template <typename T>
+constexpr __metaobject_id __unwrap_id_v = __unwrap_id<T>::value;
+
+// Concepts
+
+template <typename T>
+constexpr bool Object = is_metaobject_v<T>;
+
+template <typename T>
+constexpr bool ObjectSequence =
+	__metaobject_is_meta_obj_sequence(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Reversible =
+	__metaobject_is_meta_reversible(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Named =
+	__metaobject_is_meta_named(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Typed =
+	__metaobject_is_meta_typed(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Scope =
+	__metaobject_is_meta_scope(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Inheritance =
+	__metaobject_is_meta_inheritance(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool ScopeMember =
+	__metaobject_is_meta_scope_member(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool EnumMember =
+	__metaobject_is_meta_enum_member(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool RecordMember =
+	__metaobject_is_meta_record_member(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Alias =
+	__metaobject_is_meta_alias(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Constant =
+	__metaobject_is_meta_constant(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Variable =
+	__metaobject_is_meta_variable(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Namespace =
+	__metaobject_is_meta_namespace(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool GlobalScope =
+	__metaobject_is_meta_global_scope(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Type =
+	__metaobject_is_meta_type(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool TagType =
+	__metaobject_is_meta_tag_type(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Enum =
+	__metaobject_is_meta_enum(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Record =
+	__metaobject_is_meta_record(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Class =
+	__metaobject_is_meta_class(__unwrap_id_v<T>);
+
+template <typename T>
+constexpr bool Specifier =
+	__metaobject_is_meta_specifier(__unwrap_id_v<T>);
+
+// Operations
+
+template <typename T>
+struct get_source_file
+{
+	static constexpr const char value[] =
+		__metaobject_get_source_file(__unwrap_id_v<T>);
+
+	constexpr operator const char* (void) const {
+		return __metaobject_get_source_file(__unwrap_id_v<T>);
+	}
+};
+
+template <typename T>
+constexpr auto get_source_file_v = get_source_file<T>::value;
+
+template <typename T>
+struct get_source_line
+ : integral_constant<unsigned, __metaobject_get_source_line(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr unsigned get_source_line_v = get_source_line<T>::value;
+
+template <typename T>
+struct get_source_column
+ : integral_constant<unsigned, __metaobject_get_source_column(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr unsigned get_source_column_v = get_source_column<T>::value;
+
+template <typename T>
+struct get_underlying_object
+{
+	typedef __metaobject<
+		__metaobject_get_underlying_object(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_underlying_object_m = typename get_underlying_object<T>::type;
+
+template <typename T>
+struct get_size
+ : integral_constant<unsigned, __metaobject_get_size(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr unsigned get_size_v = get_size<T>::value;
+
+template <typename T, unsigned I>
+struct get_element
+{
+	typedef __metaobject<
+		__metaobject_get_element(__unwrap_id_v<T>, I)
+	> type;
+};
+
+template <typename T, unsigned I>
+using get_element_m = typename get_element<T, I>::type;
+
+template <typename T>
+struct is_anonymous
+ : integral_constant<bool, __metaobject_is_anonymous(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_anonymous_v = is_anonymous<T>::value;
+
+template <typename T>
+struct get_base_name
+{
+	static constexpr const char value[] =
+		__metaobject_get_base_name(__unwrap_id_v<T>);
+
+	constexpr operator const char* (void) const {
+		return __metaobject_get_base_name(__unwrap_id_v<T>);
+	}
+};
+
+template <typename T>
+constexpr auto get_base_name_v = get_base_name<T>::value;
+
+template <typename T>
+struct get_display_name
+{
+	static constexpr const char value[] =
+		__metaobject_get_display_name(__unwrap_id_v<T>);
+
+	constexpr operator const char* (void) const {
+		return __metaobject_get_display_name(__unwrap_id_v<T>);
+	}
+};
+
+template <typename T>
+constexpr auto get_display_name_v = get_display_name<T>::value;
+
+template <typename T>
+struct get_scope
+{
+	typedef __metaobject<__metaobject_get_scope(__unwrap_id_v<T>)> type;
+};
+
+template <typename T>
+using get_scope_m = typename get_scope<T>::type;
+
+template <typename T>
+struct get_type
+{
+	typedef __metaobject<__metaobject_get_type(__unwrap_id_v<T>)> type;
+};
+
+template <typename T>
+using get_type_m = typename get_type<T>::type;
+
+template <typename T>
+struct get_aliased
+{
+	typedef __metaobject<__metaobject_get_aliased(__unwrap_id_v<T>)> type;
+};
+
+template <typename T>
+using get_aliased_m = typename get_aliased<T>::type;
+
+template <typename T>
+struct get_elaborated_type_specifier
+{
+	typedef __metaobject<__metaobject_get_tag_specifier(__unwrap_id_v<T>)>
+		type;
+};
+
+template <typename T>
+using get_elaborated_type_specifier_m =
+	typename get_elaborated_type_specifier<T>::type;
+
+template <typename T>
+struct is_scoped_enum
+ : integral_constant<bool, __metaobject_is_scoped_enum(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
+
+template <typename T>
+struct is_enum
+ : integral_constant<bool, __metaobject_is_enum(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_enum_v = is_enum<T>::value;
+
+template <typename T>
+struct is_class
+ : integral_constant<bool, __metaobject_is_class(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_class_v = is_class<T>::value;
+
+template <typename T>
+struct is_struct
+ : integral_constant<bool, __metaobject_is_struct(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_struct_v = is_struct<T>::value;
+
+template <typename T>
+struct is_union
+ : integral_constant<bool, __metaobject_is_union(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_union_v = is_union<T>::value;
+
+template <typename T>
+struct get_base_classes
+{
+	typedef __metaobject<
+		__metaobject_get_base_classes(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_base_classes_m = typename get_base_classes<T>::type;
+
+template <typename T>
+struct get_public_base_classes
+{
+	typedef __metaobject<
+		__metaobject_hide_protected(
+		__metaobject_get_base_classes(__unwrap_id_v<T>))
+	> type;
+};
+
+template <typename T>
+using get_public_base_classes_m = typename get_public_base_classes<T>::type;
+
+template <typename T>
+struct get_base_class
+{
+	typedef __metaobject<
+		__metaobject_get_base_class(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_base_class_m = typename get_base_class<T>::type;
+
+template <typename T>
+struct get_member_types
+{
+	typedef __metaobject<
+		__metaobject_get_member_types(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_member_types_m = typename get_member_types<T>::type;
+
+template <typename T>
+struct get_public_member_types
+{
+	typedef __metaobject<
+		__metaobject_hide_protected(
+		__metaobject_get_member_types(__unwrap_id_v<T>))
+	> type;
+};
+
+template <typename T>
+using get_public_member_types_m = typename get_public_member_types<T>::type;
+
+template <typename T>
+struct get_data_members
+{
+	typedef __metaobject<
+		__metaobject_get_member_variables(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_data_members_m = typename get_data_members<T>::type;
+
+template <typename T>
+struct get_public_data_members
+{
+	typedef __metaobject<
+		__metaobject_hide_protected(
+		__metaobject_get_member_variables(__unwrap_id_v<T>))
+	> type;
+};
+
+template <typename T>
+using get_public_data_members_m = typename get_public_data_members<T>::type;
+
+template <typename T>
+struct get_enumerators
+{
+	typedef __metaobject<
+		__metaobject_get_member_constants(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_enumerators_m = typename get_enumerators<T>::type;
+
+template <typename T, template <class...> class Tpl>
+struct unpack_sequence {
+	template <__metaobject_id ... MoIds>
+	struct __unpack_helper {
+		typedef Tpl<__metaobject<MoIds>...> type;
+	};
+
+	typedef typename __unpack_metaobject_seq<
+		__unpack_helper,
+		__unwrap_id_v<T>
+	>::type type;
+};
+
+template <typename T, template <class...> class Tpl>
+using unpack_sequence_t = typename unpack_sequence<T, Tpl>::type;
+
+template <typename T>
+struct get_access_specifier
+{
+	typedef __metaobject<
+		__metaobject_get_access_specifier(__unwrap_id_v<T>)
+	> type;
+};
+
+template <typename T>
+using get_access_specifier_m = typename get_access_specifier<T>::type;
+
+template <typename T>
+struct is_public
+ : integral_constant<bool, __metaobject_is_public(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_public_v = is_public<T>::value;
+
+template <typename T>
+struct is_protected
+ : integral_constant<bool, __metaobject_is_protected(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_protected_v = is_protected<T>::value;
+
+template <typename T>
+struct is_private
+ : integral_constant<bool, __metaobject_is_private(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_private_v = is_private<T>::value;
+
+template <typename T>
+struct is_static
+ : integral_constant<bool, __metaobject_is_static(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_static_v = is_static<T>::value;
+
+template <typename T>
+struct is_virtual
+ : integral_constant<bool, __metaobject_is_virtual(__unwrap_id_v<T>)>
+{ };
+
+template <typename T>
+constexpr bool is_virtual_v = is_virtual<T>::value;
+
+template <typename T>
+struct get_pointer
+ : integral_constant<
+	__unrefltype(__metaobject_get_pointer(__unwrap_id_v<T>)),
+	__metaobject_get_pointer(__unwrap_id_v<T>)
+> { };
+
+template <typename T>
+constexpr auto get_pointer_v = get_pointer<T>::value;
+
+template <typename T>
+struct get_constant
+ : integral_constant<
+	__unrefltype(__metaobject_get_constant(__unwrap_id_v<T>)),
+	__metaobject_get_constant(__unwrap_id_v<T>)
+> { };
+
+template <typename T>
+constexpr auto get_constant_v = get_constant<T>::value;
+
+template <typename T>
+struct get_reflected_type
+{
+	typedef __unrefltype(__unwrap_id_v<T>) type;
+};
+
+template <typename T>
+using get_reflected_type_t = typename get_reflected_type<T>::type;
+
+} // namespace meta
+} // namespace std
+
+#define reflexpr(...) std::__metaobject<__reflexpr(__VA_ARGS__)>
+
+#else
+#error Reflection support is required. Use -freflection
+#endif
+
+#endif // include guard

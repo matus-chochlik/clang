@@ -166,6 +166,31 @@ protected:
     unsigned IsType : 1; // true if operand is a type, false if an expression.
   };
 
+  class ReflexprExprBitfields {
+    friend class ReflexprExpr;
+    unsigned : NumExprBits;
+    unsigned Kind : 5;
+    unsigned SeqKind : 3;
+    unsigned ArgKind : 3;
+    unsigned RemoveSugar : 1;
+    unsigned HideProtected : 1;
+    unsigned HidePrivate : 1;
+  };
+
+  class UnaryMetaobjectOpExprBitfields {
+    friend class UnaryMetaobjectOpExpr;
+    unsigned : NumExprBits;
+    unsigned Kind : 6;
+    unsigned ResKind : 3;
+  };
+
+  class NaryMetaobjectOpExprBitfields {
+    friend class NaryMetaobjectOpExpr;
+    unsigned : NumExprBits;
+    unsigned Kind : 1;
+    unsigned ResKind : 3;
+  };
+
   class DeclRefExprBitfields {
     friend class DeclRefExpr;
     friend class ASTStmtReader; // deserialization
@@ -260,6 +285,9 @@ protected:
     CharacterLiteralBitfields CharacterLiteralBits;
     FloatingLiteralBitfields FloatingLiteralBits;
     UnaryExprOrTypeTraitExprBitfields UnaryExprOrTypeTraitExprBits;
+    ReflexprExprBitfields ReflexprExprBits;
+    UnaryMetaobjectOpExprBitfields UnaryMetaobjectOpExprBits;
+    NaryMetaobjectOpExprBitfields NaryMetaobjectOpExprBits;
     DeclRefExprBitfields DeclRefExprBits;
     CastExprBitfields CastExprBits;
     CallExprBitfields CallExprBits;

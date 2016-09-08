@@ -333,6 +333,12 @@ void ASTTypeWriter::VisitDecltypeType(const DecltypeType *T) {
   Code = TYPE_DECLTYPE;
 }
 
+void ASTTypeWriter::VisitUnrefltypeType(const UnrefltypeType *T) {
+  Record.AddTypeRef(T->getUnderlyingType());
+  Record.AddStmt(T->getUnderlyingExpr());
+  Code = TYPE_UNREFLTYPE;
+}
+
 void ASTTypeWriter::VisitUnaryTransformType(const UnaryTransformType *T) {
   Record.AddTypeRef(T->getBaseType());
   Record.AddTypeRef(T->getUnderlyingType());
@@ -668,7 +674,9 @@ void TypeLocWriter::VisitTypeOfTypeLoc(TypeOfTypeLoc TL) {
 void TypeLocWriter::VisitDecltypeTypeLoc(DecltypeTypeLoc TL) {
   Record.AddSourceLocation(TL.getNameLoc());
 }
-
+void TypeLocWriter::VisitUnrefltypeTypeLoc(UnrefltypeTypeLoc TL) {
+  Record.AddSourceLocation(TL.getNameLoc());
+}
 void TypeLocWriter::VisitUnaryTransformTypeLoc(UnaryTransformTypeLoc TL) {
   Record.AddSourceLocation(TL.getKWLoc());
   Record.AddSourceLocation(TL.getLParenLoc());
@@ -4301,6 +4309,8 @@ uint64_t ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
                      PREDEF_DECL_CF_CONSTANT_STRING_TAG_ID);
   RegisterPredefDecl(Context.TypePackElementDecl,
                      PREDEF_DECL_TYPE_PACK_ELEMENT_ID);
+  RegisterPredefDecl(Context.UnpackMetaobjectSeqDecl,
+                     PREDEF_DECL_UNPACK_METAOBJECT_SEQ_ID);
 
   // Build a record containing all of the tentative definitions in this file, in
   // TentativeDefinitions order.  Generally, this record will be empty for

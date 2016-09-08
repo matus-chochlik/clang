@@ -739,6 +739,13 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
       return false;
     break;
 
+  case Type::Unrefltype:
+    if (!IsStructurallyEquivalent(Context,
+                                cast<UnrefltypeType>(T1)->getUnderlyingExpr(),
+                                cast<UnrefltypeType>(T2)->getUnderlyingExpr()))
+      return false;
+    break;
+
   case Type::Auto:
     if (!IsStructurallyEquivalent(Context,
                                   cast<AutoType>(T1)->getDeducedType(),

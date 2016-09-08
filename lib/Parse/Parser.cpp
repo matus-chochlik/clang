@@ -1628,7 +1628,7 @@ bool Parser::TryAnnotateTypeOrScopeToken(bool EnteringContext, bool NeedType) {
   assert((Tok.is(tok::identifier) || Tok.is(tok::coloncolon) ||
           Tok.is(tok::kw_typename) || Tok.is(tok::annot_cxxscope) ||
           Tok.is(tok::kw_decltype) || Tok.is(tok::annot_template_id) ||
-          Tok.is(tok::kw___super)) &&
+          Tok.is(tok::kw___unrefltype) || Tok.is(tok::kw___super)) &&
          "Cannot be a type or scope token!");
 
   if (Tok.is(tok::kw_typename)) {
@@ -1663,7 +1663,7 @@ bool Parser::TryAnnotateTypeOrScopeToken(bool EnteringContext, bool NeedType) {
       return true;
     if (!SS.isSet()) {
       if (Tok.is(tok::identifier) || Tok.is(tok::annot_template_id) ||
-          Tok.is(tok::annot_decltype)) {
+          Tok.is(tok::annot_decltype) || Tok.is(tok::annot___unrefltype)) {
         // Attempt to recover by skipping the invalid 'typename'
         if (Tok.is(tok::annot_decltype) ||
             (!TryAnnotateTypeOrScopeToken(EnteringContext, NeedType) &&
@@ -1856,7 +1856,8 @@ bool Parser::TryAnnotateCXXScopeToken(bool EnteringContext) {
          "Call sites of this function should be guarded by checking for C++");
   assert((Tok.is(tok::identifier) || Tok.is(tok::coloncolon) ||
           (Tok.is(tok::annot_template_id) && NextToken().is(tok::coloncolon)) ||
-          Tok.is(tok::kw_decltype) || Tok.is(tok::kw___super)) &&
+          Tok.is(tok::kw_decltype) || Tok.is(tok::kw___unrefltype) ||
+          Tok.is(tok::kw___super)) &&
          "Cannot be a type or scope token!");
 
   CXXScopeSpec SS;

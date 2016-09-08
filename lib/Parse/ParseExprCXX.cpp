@@ -271,6 +271,24 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
     HasScopeSpecifier = true;
   }
 
+  if (!HasScopeSpecifier &&
+      Tok.isOneOf(tok::kw___unrefltype, tok::annot___unrefltype)) {
+    DeclSpec DS(AttrFactory);
+    SourceLocation DeclLoc = Tok.getLocation();
+    SourceLocation EndLoc  = ParseUnrefltypeSpecifier(DS);
+
+    SourceLocation CCLoc;
+    if (!TryConsumeToken(tok::coloncolon, CCLoc)) {
+      AnnotateExistingUnrefltypeSpecifier(DS, DeclLoc, EndLoc);
+      return false;
+    }
+
+    if (Actions.ActOnCXXNestedNameSpecifierUnrefltype(SS, DS, CCLoc))
+      SS.SetInvalid(SourceRange(DeclLoc, CCLoc));
+
+    HasScopeSpecifier = true;
+  }
+
   while (true) {
     if (HasScopeSpecifier) {
       // C++ [basic.lookup.classref]p5:
@@ -1951,12 +1969,25 @@ void Parser::ParseCXXSimpleTypeSpecifier(DeclSpec &DS) {
   case tok::kw_char32_t:
     DS.SetTypeSpecType(DeclSpec::TST_char32, Loc, PrevSpec, DiagID, Policy);
     break;
+  case tok::kw___metaobject_id:
+    DS.SetTypeSpecType(DeclSpec::TST_metaobject_id, Loc, PrevSpec, DiagID,
+                       Policy);
+    break;
   case tok::kw_bool:
     DS.SetTypeSpecType(DeclSpec::TST_bool, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::annot_decltype:
   case tok::kw_decltype:
     DS.SetRangeEnd(ParseDecltypeSpecifier(DS));
+    return DS.Finish(Actions, Policy);
+
+  case tok::annot___unrefltype:
+  case tok::kw___unrefltype:
+    if (!getLangOpts().Reflection) {
+      Diag(Tok, diag::err_using_unrefltype_without_reflection);
+      return;
+    }
+    DS.SetRangeEnd(ParseUnrefltypeSpecifier(DS));
     return DS.Finish(Actions, Policy);
 
   // GNU typeof support.
@@ -2595,6 +2626,16 @@ bool Parser::ParseUnqualifiedId(CXXScopeSpec &SS, bool EnteringContext,
       }
       return true;
     }
+
+    if (SS.isEmpty() && Tok.is(tok::kw___unrefltype)) {
+      DeclSpec DS(AttrFactory);
+      SourceLocation EndLoc = ParseUnrefltypeSpecifier(DS);
+      if (ParsedType Type = Actions.getDestructorType(DS, ObjectType)) {
+        Result.setDestructorName(TildeLoc, Type, EndLoc);
+        return false;
+      }
+      return true;
+    }
     
     // Parse the class-name.
     if (Tok.isNot(tok::identifier)) {
@@ -3091,6 +3132,248 @@ ExprResult Parser::ParseExpressionTrait() {
                                       T.getCloseLocation());
 }
 
+// Reflection and Metaobject operations
+static UnaryMetaobjectOp UnaryMetaobjectOpFromTokKind(tok::TokenKind kind) {
+  switch (kind) {
+  default: llvm_unreachable("Not a known metaobject operation");
+#define METAOBJECT_OP_1(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling: return UMOO_ ## Name;
+#include "clang/Basic/TokenKinds.def"
+#define METAOBJECT_OP_2(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling:
+#include "clang/Basic/TokenKinds.def"
+    llvm_unreachable("Not an unary metaobject operation!");
+  }
+}
+
+// Reflection and Metaobject operations
+static NaryMetaobjectOp NaryMetaobjectOpFromTokKind(tok::TokenKind kind) {
+  switch (kind) {
+  default: llvm_unreachable("Not a known metaobject operation");
+#define METAOBJECT_OP_2(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling: return NMOO_ ## Name;
+#include "clang/Basic/TokenKinds.def"
+#define METAOBJECT_OP_1(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling:
+#include "clang/Basic/TokenKinds.def"
+    llvm_unreachable("Not an n-ary metaobject operation!");
+  }
+}
+
+static MetaobjectOpResult MetaobjectOpResultFromTokKind(tok::TokenKind kind) {
+  switch (kind) {
+  default: llvm_unreachable("Not a known metaobject operation");
+#define METAOBJECT_OP_1(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling: return MOOR_ ## Result;
+#define METAOBJECT_OP_2(Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling: return MOOR_ ## Result;
+#include "clang/Basic/TokenKinds.def"
+  }
+}
+
+static unsigned MetaobjectOpArity(tok::TokenKind kind) {
+  switch (kind) {
+    default: llvm_unreachable("Not a known metaobject operation");
+#define METAOBJECT_OP(Arity, Spelling, Result, Name, Key) \
+case tok::kw___metaobject_ ## Spelling: return Arity;
+#include "clang/Basic/TokenKinds.def"
+  }
+}
+//
+/// \brief Parse the built-in reflection pseudo-functions that allow
+/// implementation of the metaobject operation functionality
+///
+ExprResult Parser::ParseMetaobjectOperationExpression() {
+
+  Token OpTok = Tok;
+  SourceLocation OpLoc = ConsumeToken(); // eat __metaobj_*
+  unsigned Arity = MetaobjectOpArity(OpTok.getKind());
+
+  if (Arity == 1) {
+    return ParseUnaryMetaobjectOperationExpression(OpTok, OpLoc);
+  }
+  return ParseNaryMetaobjectOperationExpression(OpTok, OpLoc, Arity);
+}
+
+ExprResult
+Parser::ParseUnaryMetaobjectOperationExpression(Token OpTok,
+                                                SourceLocation OpLoc) {
+  BalancedDelimiterTracker Parens(*this, tok::l_paren);
+  if (Parens.expectAndConsume(diag::err_expected_lparen_after, OpTok.getName()))
+    return ExprError();
+
+  UnaryMetaobjectOp Operation = UnaryMetaobjectOpFromTokKind(OpTok.getKind());
+  MetaobjectOpResult OpResult = MetaobjectOpResultFromTokKind(OpTok.getKind());
+
+  ExprResult ArgExpr;
+  ArgExpr = ParseCastExpression(false, false, NotTypeCast);
+
+  if (ArgExpr.isInvalid())
+    return ExprError();
+
+  if (Tok.is(tok::r_paren)) {
+    Parens.consumeClose();
+    return Actions.ActOnUnaryMetaobjectOpExpr(Operation, OpResult,
+                                              ArgExpr,
+                                              OpLoc, Parens.getCloseLocation());
+  }
+  return ExprError();
+}
+
+ExprResult
+Parser::ParseNaryMetaobjectOperationExpression(Token OpTok,
+                                               SourceLocation OpLoc,
+                                               unsigned Arity) {
+  BalancedDelimiterTracker Parens(*this, tok::l_paren);
+  if (Parens.expectAndConsume(diag::err_expected_lparen_after, OpTok.getName()))
+    return ExprError();
+
+  NaryMetaobjectOp Operation = NaryMetaobjectOpFromTokKind(OpTok.getKind());
+  MetaobjectOpResult OpResult = MetaobjectOpResultFromTokKind(OpTok.getKind());
+
+  ExprResult ArgExpr[3];
+  // The first argument must always be a __metaobject_id expression
+  ArgExpr[0] = ParseCastExpression(false, false, NotTypeCast);
+
+  if (ArgExpr[0].isInvalid())
+    return ExprError();
+
+  for (unsigned i=1; i<Arity; ++i) {
+
+    if (Tok.isNot(tok::comma)) {
+      Diag(Tok.getLocation(), diag::err_metaobject_op_arity)
+        << Arity << 0 << (Arity > 1) << 1 << SourceRange(Tok.getLocation());
+    } else {
+      ConsumeToken(); // ','
+    }
+    ArgExpr[i] = ParseCastExpression(false, false, NotTypeCast);
+    if (ArgExpr[i].isInvalid())
+      return ExprError();
+  }
+
+  if (Tok.is(tok::r_paren)) {
+    Parens.consumeClose();
+    return Actions.ActOnNaryMetaobjectOpExpr(Operation, OpResult,
+                                             Arity, ArgExpr,
+                                             OpLoc, Parens.getCloseLocation());
+  }
+  return ExprError();
+}
+//
+/// \brief Parse a __reflexpr expression.
+///
+ExprResult Parser::ParseReflexprExpression(bool idOnly) {
+  assert(Tok.isOneOf(tok::kw___reflexpr, tok::kw_reflexpr) &&
+         "Not a __reflexpr expression");
+  Token OpTok = Tok;
+  ConsumeToken(); // eat reflexpr
+
+  BalancedDelimiterTracker Parens(*this, tok::l_paren);
+  if (Parens.expectAndConsume(diag::err_expected_lparen_after, "__reflexpr"))
+    return ExprError();
+  
+  if (Tok.is(tok::r_paren)) {
+    // ()
+    Parens.consumeClose();
+    return Actions.ActOnReflexprGSExpr(idOnly, OpTok.getLocation(),
+                                       Parens.getRange());
+  } else {
+    // (::)
+    if (Tok.is(tok::coloncolon)) {
+      TentativeParsingAction tpa(*this);
+      ConsumeToken(); // ::
+      if (Tok.is(tok::r_paren)) {
+        Parens.consumeClose();
+        ExprResult Result = Actions.ActOnReflexprGSExpr(idOnly,
+                                                        OpTok.getLocation(),
+                                                        Parens.getRange());
+        if (!Result.isInvalid()) {
+          tpa.Commit();
+          return Result;
+        }
+      }
+      tpa.Revert();
+    }
+    // (specifier)
+    if (Tok.isOneOf(tok::kw_private, tok::kw_protected, tok::kw_public,
+                    tok::kw_class, tok::kw_enum, tok::kw_struct, tok::kw_union,
+                    tok::kw_static)) {
+      TentativeParsingAction tpa(*this);
+      tok::TokenKind SpecTok = Tok.getKind();
+      ConsumeToken(); // specifier
+      if (Tok.is(tok::r_paren)) {
+        Parens.consumeClose();
+        ExprResult Res = Actions.ActOnReflexprSpecExpr(idOnly, SpecTok,
+                                                       OpTok.getLocation(),
+                                                       Parens.getRange());
+        if (!Res.isInvalid()) {
+          tpa.Commit();
+          return Res;
+        }
+      }
+      tpa.Revert();
+    }
+    /* (named-declaration) */ {
+      TentativeParsingAction tpa(*this);
+
+      CXXScopeSpec SS;
+      if (!ParseOptionalCXXScopeSpecifier(SS, ParsedType(), false)) {
+
+        if(!SS.isInvalid() && Tok.is(tok::identifier)) {
+          IdentifierInfo *Ident = Tok.getIdentifierInfo();
+
+          ConsumeToken(); // identifier
+
+          if(Tok.is(tok::r_paren)) {
+            Parens.consumeClose();
+
+            if(Ident != nullptr) {
+              ExprResult Res = Actions.ActOnReflexprScopedExpr(idOnly,
+                                                     getCurScope(),
+                                                     SS, *Ident,
+                                                     OpTok.getLocation(),
+                                                     Parens.getRange());
+              if(!Res.isInvalid()) {
+                tpa.Commit();
+                return Res;
+              }
+            }
+          }
+        }
+      }
+      tpa.Revert();
+    }
+    if (isCXXTypeId(TypeIdInParens)) {
+      EnterExpressionEvaluationContext Unevaluated(Actions, Sema::Unevaluated,
+                                                 Sema::ReuseLambdaContextDecl);
+
+      TentativeParsingAction tpa(*this);
+      DeclSpec DS(AttrFactory);
+      ParseSpecifierQualifierList(DS);
+      Declarator DeclaratorInfo(DS, Declarator::TypeNameContext);
+      ParseDeclarator(DeclaratorInfo);
+
+      if(Tok.is(tok::r_paren)) {
+        Parens.consumeClose();
+
+        if (!DeclaratorInfo.isInvalidType()) {
+          ExprResult Res = Actions.ActOnReflexprTypeExpr(idOnly,
+                                                getCurScope(), DeclaratorInfo,
+                                                OpTok.getLocation(),
+                                                Parens.getRange());
+          if(!Res.isInvalid()) {
+            tpa.Commit();
+            return Res;
+          }
+        }
+      }
+      tpa.Revert();
+    }
+    // TODO[reflexpr]
+  }
+
+  return ExprError();
+}
 
 /// ParseCXXAmbiguousParenExpression - We have parsed the left paren of a
 /// parenthesized ambiguous type-id. This uses tentative parsing to disambiguate

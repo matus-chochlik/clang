@@ -3957,6 +3957,9 @@ static void captureVariablyModifiedType(ASTContext &Context, QualType T,
     case Type::Decltype:
       T = cast<DecltypeType>(Ty)->desugar();
       break;
+    case Type::Unrefltype:
+      T = cast<UnrefltypeType>(Ty)->desugar();
+      break;
     case Type::Auto:
       T = cast<AutoType>(Ty)->getDeducedType();
       break;
@@ -12961,9 +12964,9 @@ ExprResult Sema::TransformToPotentiallyEvaluated(Expr *E) {
 void
 Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
                                       Decl *LambdaContextDecl,
-                                      bool IsDecltype) {
+                                      bool IsDecltype, bool IsUnrefltype) {
   ExprEvalContexts.emplace_back(NewContext, ExprCleanupObjects.size(), Cleanup,
-                                LambdaContextDecl, IsDecltype);
+                                LambdaContextDecl, IsDecltype, IsUnrefltype);
   Cleanup.reset();
   if (!MaybeODRUseExprs.empty())
     std::swap(MaybeODRUseExprs, ExprEvalContexts.back().SavedMaybeODRUseExprs);
@@ -12972,9 +12975,10 @@ Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
 void
 Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
                                       ReuseLambdaContextDecl_t,
-                                      bool IsDecltype) {
+                                      bool IsDecltype, bool IsUnrefltype) {
   Decl *ClosureContextDecl = ExprEvalContexts.back().ManglingContextDecl;
-  PushExpressionEvaluationContext(NewContext, ClosureContextDecl, IsDecltype);
+  PushExpressionEvaluationContext(NewContext, ClosureContextDecl,
+                                  IsDecltype, IsUnrefltype);
 }
 
 void Sema::PopExpressionEvaluationContext() {

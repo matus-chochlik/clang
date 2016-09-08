@@ -424,6 +424,18 @@ public:
   void VisitUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *Ex,
                               ExplodedNode *Pred, ExplodedNodeSet &Dst);
 
+  /// VisitReflexprExpr - Transfer function for reflexpr.
+  void VisitReflexprExpr(const ReflexprExpr *Ex,
+                         ExplodedNode *Pred, ExplodedNodeSet &Dst);
+
+  /// VisitUnaryMetaobjectOpExpr - Transfer function for metaobject operation.
+  void VisitUnaryMetaobjectOpExpr(const UnaryMetaobjectOpExpr *Ex,
+                                  ExplodedNode *Pred, ExplodedNodeSet &Dst);
+
+  /// VisitNaryMetaobjectOpExpr - Transfer function for metaobject operation.
+  void VisitNaryMetaobjectOpExpr(const NaryMetaobjectOpExpr *Ex,
+                                 ExplodedNode *Pred, ExplodedNodeSet &Dst);
+
   /// VisitUnaryOperator - Transfer function logic for unary operators.
   void VisitUnaryOperator(const UnaryOperator* B, ExplodedNode *Pred, 
                           ExplodedNodeSet &Dst);
