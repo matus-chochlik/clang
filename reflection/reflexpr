@@ -121,6 +121,14 @@ constexpr bool Specifier =
 
 // Operations
 
+template <typename T, typename U>
+struct reflects_same
+ : integral_constant<bool, __metaobject_reflects_same(__unwrap_id_v<T>, __unwrap_id_v<U>)>
+{ };
+
+template <typename T, typename U>
+constexpr bool reflects_same_v = reflects_same<T, U>::value;
+
 template <typename T>
 struct get_source_file
 {
