@@ -656,7 +656,8 @@ void Sema::DiagnoseUnknownTypeName(IdentifierInfo *&II,
                        Name, nullptr, true, TemplateResult,
                        MemberOfUnknownSpecialization) == TNK_Type_template) {
       TemplateName TplName = TemplateResult.get();
-      Diag(IILoc, diag::err_template_missing_args) << TplName;
+      Diag(IILoc, diag::err_template_missing_args)
+        << (int)getTemplateNameKindForDiagnostics(TplName) << TplName;
       if (TemplateDecl *TplDecl = TplName.getAsTemplateDecl()) {
         Diag(TplDecl->getLocation(), diag::note_template_decl_here)
           << TplDecl->getTemplateParameters()->getSourceRange();
@@ -1070,6 +1071,24 @@ Corrected:
 
   bool ADL = UseArgumentDependentLookup(SS, Result, NextToken.is(tok::l_paren));
   return BuildDeclarationNameExpr(SS, Result, ADL);
+}
+
+Sema::TemplateNameKindForDiagnostics
+Sema::getTemplateNameKindForDiagnostics(TemplateName Name) {
+  auto *TD = Name.getAsTemplateDecl();
+  if (!TD)
+    return TemplateNameKindForDiagnostics::DependentTemplate;
+  if (isa<ClassTemplateDecl>(TD))
+    return TemplateNameKindForDiagnostics::ClassTemplate;
+  if (isa<FunctionTemplateDecl>(TD))
+    return TemplateNameKindForDiagnostics::FunctionTemplate;
+  if (isa<VarTemplateDecl>(TD))
+    return TemplateNameKindForDiagnostics::VarTemplate;
+  if (isa<TypeAliasTemplateDecl>(TD))
+    return TemplateNameKindForDiagnostics::AliasTemplate;
+  if (isa<TemplateTemplateParmDecl>(TD))
+    return TemplateNameKindForDiagnostics::TemplateTemplateParam;
+  return TemplateNameKindForDiagnostics::DependentTemplate;
 }
 
 // Determines the context to return to after temporarily entering a
@@ -4504,7 +4523,7 @@ Decl *Sema::BuildAnonymousStructOrUnion(Scope *S, DeclSpec &DS,
     // trivial in almost all cases, except if a union member has an in-class
     // initializer:
     //   union { int n = 0; };
-    ActOnUninitializedDecl(Anon, /*TypeMayContainAuto=*/false);
+    ActOnUninitializedDecl(Anon);
   }
   Anon->setImplicit();
 
@@ -9796,8 +9815,7 @@ QualType Sema::deduceVarTypeFromInitializer(VarDecl *VDecl,
 /// AddInitializerToDecl - Adds the initializer Init to the
 /// declaration dcl. If DirectInit is true, this is C++ direct
 /// initialization rather than copy initialization.
-void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
-                                bool DirectInit, bool TypeMayContainAuto) {
+void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
   // If there is no declaration, there was an error parsing it.  Just ignore
   // the initializer.
   if (!RealDecl || RealDecl->isInvalidDecl()) {
@@ -9822,7 +9840,7 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
   }
 
   // C++11 [decl.spec.auto]p6. Deduce the type which 'auto' stands in for.
-  if (TypeMayContainAuto && VDecl->getType()->isUndeducedType()) {
+  if (VDecl->getType()->isUndeducedType()) {
     // Attempt typo correction early so that the type of the init expression can
     // be deduced based on the chosen correction if the original init contains a
     // TypoExpr.
@@ -10294,8 +10312,7 @@ bool Sema::canInitializeWithParenthesizedList(QualType TargetType) {
          TargetType->getContainedAutoType();
 }
 
-void Sema::ActOnUninitializedDecl(Decl *RealDecl,
-                                  bool TypeMayContainAuto) {
+void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
   // If there is no declaration, there was an error parsing it. Just ignore it.
   if (!RealDecl)
     return;
@@ -10311,7 +10328,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl,
     }
 
     // C++11 [dcl.spec.auto]p3
-    if (TypeMayContainAuto && Type->getContainedAutoType()) {
+    if (Type->isUndeducedType()) {
       Diag(Var->getLocation(), diag::err_auto_var_requires_init)
         << Var->getDeclName() << Type;
       Var->setInvalidDecl();
@@ -11047,6 +11064,11 @@ Sema::FinalizeDeclaration(Decl *ThisDecl) {
   }
 }
 
+static bool hasDeducedAuto(DeclaratorDecl *DD) {
+  auto *VD = dyn_cast<VarDecl>(DD);
+  return VD && !VD->getType()->hasAutoForTrailingReturnType();
+}
+
 Sema::DeclGroupPtrTy Sema::FinalizeDeclaratorGroup(Scope *S, const DeclSpec &DS,
                                                    ArrayRef<Decl *> Group) {
   SmallVector<Decl*, 8> Decls;
@@ -11057,29 +11079,46 @@ Sema::DeclGroupPtrTy Sema::FinalizeDeclaratorGroup(Scope *S, const DeclSpec &DS,
   DeclaratorDecl *FirstDeclaratorInGroup = nullptr;
   DecompositionDecl *FirstDecompDeclaratorInGroup = nullptr;
   bool DiagnosedMultipleDecomps = false;
+  DeclaratorDecl *FirstNonDeducedAutoInGroup = nullptr;
+  bool DiagnosedNonDeducedAuto = false;
 
   for (unsigned i = 0, e = Group.size(); i != e; ++i) {
     if (Decl *D = Group[i]) {
-      auto *DD = dyn_cast<DeclaratorDecl>(D);
-      if (DD && !FirstDeclaratorInGroup)
-        FirstDeclaratorInGroup = DD;
+      // For declarators, there are some additional syntactic-ish checks we need
+      // to perform.
+      if (auto *DD = dyn_cast<DeclaratorDecl>(D)) {
+        if (!FirstDeclaratorInGroup)
+          FirstDeclaratorInGroup = DD;
+        if (!FirstDecompDeclaratorInGroup)
+          FirstDecompDeclaratorInGroup = dyn_cast<DecompositionDecl>(D);
+        if (!FirstNonDeducedAutoInGroup && DS.containsPlaceholderType() &&
+            !hasDeducedAuto(DD))
+          FirstNonDeducedAutoInGroup = DD;
 
-      auto *Decomp = dyn_cast<DecompositionDecl>(D);
-      if (Decomp && !FirstDecompDeclaratorInGroup)
-        FirstDecompDeclaratorInGroup = Decomp;
+        if (FirstDeclaratorInGroup != DD) {
+          // A decomposition declaration cannot be combined with any other
+          // declaration in the same group.
+          if (FirstDecompDeclaratorInGroup && !DiagnosedMultipleDecomps) {
+            Diag(FirstDecompDeclaratorInGroup->getLocation(),
+                 diag::err_decomp_decl_not_alone)
+                << FirstDeclaratorInGroup->getSourceRange()
+                << DD->getSourceRange();
+            DiagnosedMultipleDecomps = true;
+          }
 
-      // A decomposition declaration cannot be combined with any other
-      // declaration in the same group.
-      auto *OtherDD = FirstDeclaratorInGroup;
-      if (OtherDD == FirstDecompDeclaratorInGroup)
-        OtherDD = DD;
-      if (OtherDD && FirstDecompDeclaratorInGroup &&
-          OtherDD != FirstDecompDeclaratorInGroup &&
-          !DiagnosedMultipleDecomps) {
-        Diag(FirstDecompDeclaratorInGroup->getLocation(),
-             diag::err_decomp_decl_not_alone)
-          << OtherDD->getSourceRange();
-        DiagnosedMultipleDecomps = true;
+          // A declarator that uses 'auto' in any way other than to declare a
+          // variable with a deduced type cannot be combined with any other
+          // declarator in the same group.
+          if (FirstNonDeducedAutoInGroup && !DiagnosedNonDeducedAuto) {
+            Diag(FirstNonDeducedAutoInGroup->getLocation(),
+                 diag::err_auto_non_deduced_not_alone)
+                << FirstNonDeducedAutoInGroup->getType()
+                       ->hasAutoForTrailingReturnType()
+                << FirstDeclaratorInGroup->getSourceRange()
+                << DD->getSourceRange();
+            DiagnosedNonDeducedAuto = true;
+          }
+        }
       }
 
       Decls.push_back(D);
@@ -11095,50 +11134,39 @@ Sema::DeclGroupPtrTy Sema::FinalizeDeclaratorGroup(Scope *S, const DeclSpec &DS,
     }
   }
 
-  return BuildDeclaratorGroup(Decls, DS.containsPlaceholderType());
+  return BuildDeclaratorGroup(Decls);
 }
 
 /// BuildDeclaratorGroup - convert a list of declarations into a declaration
 /// group, performing any necessary semantic checking.
 Sema::DeclGroupPtrTy
-Sema::BuildDeclaratorGroup(MutableArrayRef<Decl *> Group,
-                           bool TypeMayContainAuto) {
-  // C++0x [dcl.spec.auto]p7:
-  //   If the type deduced for the template parameter U is not the same in each
+Sema::BuildDeclaratorGroup(MutableArrayRef<Decl *> Group) {
+  // C++14 [dcl.spec.auto]p7: (DR1347)
+  //   If the type that replaces the placeholder type is not the same in each
   //   deduction, the program is ill-formed.
-  // FIXME: When initializer-list support is added, a distinction is needed
-  // between the deduced type U and the deduced type which 'auto' stands for.
-  //   auto a = 0, b = { 1, 2, 3 };
-  // is legal because the deduced type U is 'int' in both cases.
-  if (TypeMayContainAuto && Group.size() > 1) {
+  if (Group.size() > 1) {
     QualType Deduced;
-    CanQualType DeducedCanon;
     VarDecl *DeducedDecl = nullptr;
     for (unsigned i = 0, e = Group.size(); i != e; ++i) {
-      if (VarDecl *D = dyn_cast<VarDecl>(Group[i])) {
-        AutoType *AT = D->getType()->getContainedAutoType();
-        // Don't reissue diagnostics when instantiating a template.
-        if (AT && D->isInvalidDecl())
-          break;
-        QualType U = AT ? AT->getDeducedType() : QualType();
-        if (!U.isNull()) {
-          CanQualType UCanon = Context.getCanonicalType(U);
-          if (Deduced.isNull()) {
-            Deduced = U;
-            DeducedCanon = UCanon;
-            DeducedDecl = D;
-          } else if (DeducedCanon != UCanon) {
-            Diag(D->getTypeSourceInfo()->getTypeLoc().getBeginLoc(),
-                 diag::err_auto_different_deductions)
-              << (unsigned)AT->getKeyword()
-              << Deduced << DeducedDecl->getDeclName()
-              << U << D->getDeclName()
-              << DeducedDecl->getInit()->getSourceRange()
-              << D->getInit()->getSourceRange();
-            D->setInvalidDecl();
-            break;
-          }
-        }
+      VarDecl *D = dyn_cast<VarDecl>(Group[i]);
+      if (!D || D->isInvalidDecl())
+        break;
+      AutoType *AT = D->getType()->getContainedAutoType();
+      if (!AT || AT->getDeducedType().isNull())
+        continue;
+      if (Deduced.isNull()) {
+        Deduced = AT->getDeducedType();
+        DeducedDecl = D;
+      } else if (!Context.hasSameType(AT->getDeducedType(), Deduced)) {
+        Diag(D->getTypeSourceInfo()->getTypeLoc().getBeginLoc(),
+             diag::err_auto_different_deductions)
+          << (unsigned)AT->getKeyword()
+          << Deduced << DeducedDecl->getDeclName()
+          << AT->getDeducedType() << D->getDeclName()
+          << DeducedDecl->getInit()->getSourceRange()
+          << D->getInit()->getSourceRange();
+        D->setInvalidDecl();
+        break;
       }
     }
   }
@@ -15652,11 +15680,10 @@ DeclResult Sema::ActOnModuleImport(SourceLocation StartLoc,
 
 void Sema::ActOnModuleInclude(SourceLocation DirectiveLoc, Module *Mod) {
   checkModuleImportContext(*this, Mod, DirectiveLoc, CurContext, true);
-  BuildModuleInclude(DirectiveLoc, Mod, false/*NoImport*/);
+  BuildModuleInclude(DirectiveLoc, Mod);
 }
 
-void Sema::BuildModuleInclude(SourceLocation DirectiveLoc, Module *Mod,
-                              bool NoImport) {
+void Sema::BuildModuleInclude(SourceLocation DirectiveLoc, Module *Mod) {
   // Determine whether we're in the #include buffer for a module. The #includes
   // in that buffer do not qualify as module imports; they're just an
   // implementation detail of us building the module.
@@ -15666,7 +15693,7 @@ void Sema::BuildModuleInclude(SourceLocation DirectiveLoc, Module *Mod,
       TUKind == TU_Module &&
       getSourceManager().isWrittenInMainFile(DirectiveLoc);
 
-  bool ShouldAddImport = !IsInModuleIncludes && !NoImport;
+  bool ShouldAddImport = !IsInModuleIncludes;
 
   // If this module import was due to an inclusion directive, create an
   // implicit import declaration to capture it in the AST.
@@ -15714,11 +15741,7 @@ void Sema::ActOnModuleEnd(SourceLocation EofLoc, Module *Mod) {
   assert(File != getSourceManager().getMainFileID() &&
          "end of submodule in main source file");
   SourceLocation DirectiveLoc = getSourceManager().getIncludeLoc(File);
-  // Do not create implicit ImportDecl if we are building the implementation
-  // of a module.
-  bool NoImport = Mod->getTopLevelModuleName() == getLangOpts().CurrentModule &&
-                  !getLangOpts().isCompilingModule();
-  BuildModuleInclude(DirectiveLoc, Mod, NoImport);
+  BuildModuleInclude(DirectiveLoc, Mod);
 }
 
 void Sema::createImplicitModuleImportForErrorRecovery(SourceLocation Loc,

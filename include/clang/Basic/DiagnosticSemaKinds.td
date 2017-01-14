@@ -316,6 +316,9 @@ def warn_unneeded_member_function : Warning<
   InGroup<UnneededMemberFunction>, DefaultIgnore;
 def warn_unused_private_field: Warning<"private field %0 is not used">,
   InGroup<UnusedPrivateField>, DefaultIgnore;
+def warn_unused_lambda_capture: Warning<"lambda capture %0 is not "
+  "%select{used|required to be captured for use in an unevaluated context}1">,
+  InGroup<UnusedLambdaCapture>, DefaultIgnore;
 
 def warn_parameter_size: Warning<
   "%0 is a large (%1 bytes) pass-by-value argument; "
@@ -1900,6 +1903,10 @@ def err_auto_new_deduction_failure : Error<
 def err_auto_different_deductions : Error<
   "'%select{auto|decltype(auto)|__auto_type}0' deduced as %1 in declaration "
   "of %2 and deduced as %3 in declaration of %4">;
+def err_auto_non_deduced_not_alone : Error<
+  "%select{function with deduced return type|"
+  "declaration with trailing return type}0 "
+  "must be the only declaration in its group">;
 def err_implied_std_initializer_list_not_found : Error<
   "cannot deduce type of initializer list because std::initializer_list was "
   "not found; include <initializer_list>">;
@@ -2261,7 +2268,7 @@ def warn_unsupported_target_attribute
     InGroup<IgnoredAttributes>;
 def err_attribute_unsupported
     : Error<"%0 attribute is not supported for this target">;
-// The err_*_attribute_argument_not_int are seperate because they're used by
+// The err_*_attribute_argument_not_int are separate because they're used by
 // VerifyIntegerConstantExpression.
 def err_aligned_attribute_argument_not_int : Error<
   "'aligned' attribute requires integer constant">;
@@ -3337,8 +3344,8 @@ def note_ovl_candidate : Note<"candidate "
 def note_ovl_candidate_inherited_constructor : Note<
     "constructor from base class %0 inherited here">;
 def note_ovl_candidate_inherited_constructor_slice : Note<
-    "constructor inherited from base class cannot be used to initialize from "
-    "an argument of the derived class type">;
+    "candidate %select{constructor|template}0 ignored: "
+    "inherited constructor cannot be used to %select{copy|move}1 object">;
 def note_ovl_candidate_illegal_constructor : Note<
     "candidate %select{constructor|template}0 ignored: "
     "instantiation %select{takes|would take}0 its own class type by value">;
@@ -3373,13 +3380,14 @@ def note_ovl_candidate_has_pass_object_size_params: Note<
     "candidate address cannot be taken because parameter %0 has "
     "pass_object_size attribute">;
 def err_diagnose_if_succeeded : Error<"%0">;
-def warn_diagnose_if_succeeded : Warning<"%0">, InGroup<UserDefinedWarnings>;
+def warn_diagnose_if_succeeded : Warning<"%0">, InGroup<UserDefinedWarnings>,
+    ShowInSystemHeader;
 def note_ovl_candidate_disabled_by_function_cond_attr : Note<
     "candidate disabled: %0">;
 def note_ovl_candidate_disabled_by_extension : Note<
     "candidate disabled due to OpenCL extension">;
 def err_addrof_function_disabled_by_enable_if_attr : Error<
-    "cannot take address of function %0 becuase it has one or more "
+    "cannot take address of function %0 because it has one or more "
     "non-tautological enable_if conditions">;
 def note_addrof_ovl_candidate_disabled_by_enable_if_attr : Note<
     "candidate function made ineligible by enable_if">;
@@ -3788,11 +3796,13 @@ def err_template_decl_ref : Error<
 
 // C++ Template Argument Lists
 def err_template_missing_args : Error<
-  "use of class template %0 requires template arguments">;
+  "use of "
+  "%select{class template|function template|variable template|alias template|"
+  "template template parameter|template}0 %1 requires template arguments">;
 def err_template_arg_list_different_arity : Error<
   "%select{too few|too many}0 template arguments for "
-  "%select{class template|function template|template template parameter"
-  "|template}1 %2">;
+  "%select{class template|function template|variable template|alias template|"
+  "template template parameter|template}1 %2">;
 def note_template_decl_here : Note<"template is declared here">;
 def err_template_arg_must_be_type : Error<
   "template argument for template type parameter must be a type">;

@@ -1224,9 +1224,17 @@ Sema::CheckClassTemplate(Scope *S, unsigned TagSpec, TagUseKind TUK,
     }
   }
 
+  // If this is a templated friend in a dependent context we should not put it
+  // on the redecl chain. In some cases, the templated friend can be the most
+  // recent declaration tricking the template instantiator to make substitutions
+  // there.
+  // FIXME: Figure out how to combine with shouldLinkDependentDeclWithPrevious
+  bool ShouldAddRedecl
+    = !(TUK == TUK_Friend && CurContext->isDependentContext());
+
   CXXRecordDecl *NewClass =
     CXXRecordDecl::Create(Context, Kind, SemanticContext, KWLoc, NameLoc, Name,
-                          PrevClassTemplate?
+                          PrevClassTemplate && ShouldAddRedecl ?
                             PrevClassTemplate->getTemplatedDecl() : nullptr,
                           /*DelayTypeCreation=*/true);
   SetNestedNameSpecifier(NewClass, SS);
@@ -1245,7 +1253,11 @@ Sema::CheckClassTemplate(Scope *S, unsigned TagSpec, TagUseKind TUK,
   ClassTemplateDecl *NewTemplate
     = ClassTemplateDecl::Create(Context, SemanticContext, NameLoc,
                                 DeclarationName(Name), TemplateParams,
-                                NewClass, PrevClassTemplate);
+                                NewClass);
+
+  if (ShouldAddRedecl)
+    NewTemplate->setPreviousDecl(PrevClassTemplate);
+
   NewClass->setDescribedClassTemplate(NewTemplate);
 
   if (ModulePrivateLoc.isValid())
@@ -3314,7 +3326,7 @@ bool Sema::CheckTemplateTypeArgument(TemplateTypeParmDecl *Param,
     SourceRange SR = AL.getSourceRange();
     TemplateName Name = Arg.getAsTemplate();
     Diag(SR.getBegin(), diag::err_template_missing_args)
-      << Name << SR;
+      << (int)getTemplateNameKindForDiagnostics(Name) << Name << SR;
     if (TemplateDecl *Decl = Name.getAsTemplateDecl())
       Diag(Decl->getLocation(), diag::note_template_decl_here);
 
@@ -3899,9 +3911,7 @@ static bool diagnoseArityMismatch(Sema &S, TemplateDecl *Template,
                         TemplateArgs.getRAngleLoc());
   S.Diag(TemplateLoc, diag::err_template_arg_list_different_arity)
     << (NumArgs > NumParams)
-    << (isa<ClassTemplateDecl>(Template)? 0 :
-        isa<FunctionTemplateDecl>(Template)? 1 :
-        isa<TemplateTemplateParmDecl>(Template)? 2 : 3)
+    << (int)S.getTemplateNameKindForDiagnostics(TemplateName(Template))
     << Template << Range;
   S.Diag(Template->getLocation(), diag::note_template_decl_here)
     << Params->getSourceRange();
@@ -4009,9 +4019,7 @@ bool Sema::CheckTemplateArgumentList(TemplateDecl *Template,
         // Not enough arguments for this parameter pack.
         Diag(TemplateLoc, diag::err_template_arg_list_different_arity)
           << false
-          << (isa<ClassTemplateDecl>(Template)? 0 :
-              isa<FunctionTemplateDecl>(Template)? 1 :
-              isa<TemplateTemplateParmDecl>(Template)? 2 : 3)
+          << (int)getTemplateNameKindForDiagnostics(TemplateName(Template))
           << Template;
         Diag(Template->getLocation(), diag::note_template_decl_here)
           << Params->getSourceRange();
@@ -7777,6 +7785,7 @@ Sema::ActOnExplicitInstantiation(Scope *S,
   Specialization->setTemplateKeywordLoc(TemplateLoc);
   Specialization->setBraceRange(SourceRange());
 
+  bool PreviouslyDLLExported = Specialization->hasAttr<DLLExportAttr>();
   if (Attr)
     ProcessDeclAttributeList(S, Specialization, Attr);
 
@@ -7839,8 +7848,9 @@ Sema::ActOnExplicitInstantiation(Scope *S,
 
     // Fix a TSK_ImplicitInstantiation followed by a
     // TSK_ExplicitInstantiationDefinition
-    if (Old_TSK == TSK_ImplicitInstantiation &&
-        Specialization->hasAttr<DLLExportAttr>() &&
+    bool NewlyDLLExported =
+        !PreviouslyDLLExported && Specialization->hasAttr<DLLExportAttr>();
+    if (Old_TSK == TSK_ImplicitInstantiation && NewlyDLLExported &&
         (Context.getTargetInfo().getCXXABI().isMicrosoft() ||
          Context.getTargetInfo().getTriple().isWindowsItaniumEnvironment())) {
       // In the MS ABI, an explicit instantiation definition can add a dll

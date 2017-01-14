@@ -3438,6 +3438,12 @@ TEST_F(FormatTest, LineBreakingInBinaryExpressions) {
       "    aaaaaaaaaaaaaaaaaaaaaaaaaaaa || aaaaaaaaaaaaaaaaaaaaaaaaaaaa ||\n"
       "    aaaaaaaaaaaaaaaaaaaaaaaaaaaa) {\n}",
       OnePerLine);
+
+  verifyFormat("int i = someFunction(aaaaaaa, 0)\n"
+               "                .aaa(aaaaaaaaaaaaa) *\n"
+               "            aaaaaaa +\n"
+               "        aaaaaaa;",
+               getLLVMStyleWithColumns(40));
 }
 
 TEST_F(FormatTest, ExpressionIndentation) {
@@ -6816,6 +6822,14 @@ TEST_F(FormatTest, FormatsBracedListsInColumnLayout) {
                "    aaaaaa.aaaaaaa,\n"
                "    aaaaaa.aaaaaaa,\n"
                "};");
+
+  // Don't create hanging lists.
+  verifyFormat("someFunction(Param,\n"
+               "             {List1, List2,\n"
+               "              List3});",
+               getLLVMStyleWithColumns(35));
+  verifyFormat("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(aaaaaaaaaaaaaaaaaaa, {},\n"
+               "                               aaaaaaaaaaaaaaaaaaaaaaa);");
 }
 
 TEST_F(FormatTest, PullTrivialFunctionDefinitionsIntoSingleLine) {
