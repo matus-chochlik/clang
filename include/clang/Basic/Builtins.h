@@ -246,6 +246,9 @@ enum BuiltinTemplateKind : int {
 
   /// This names the __type_pack_element BuiltinTemplateDecl.
   BTK__type_pack_element,
+
+  /// This names the __unpack_metaobject_seq BuiltinTemplateDecl.
+  BTK__unpack_metaobject_seq
 };
 
 } // end namespace clang

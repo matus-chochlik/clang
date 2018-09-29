@@ -3518,8 +3518,6 @@ MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
   SourceLocation IdLoc = Tok.getLocation();
   // : declype(...)
   DeclSpec DS(AttrFactory);
-  // : template_name<...>
-  ParsedType TemplateTypeTy;
 
   if (Tok.is(tok::identifier)) {
     // Get the identifier. This may be a member name or a class name,

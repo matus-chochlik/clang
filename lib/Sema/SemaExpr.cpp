@@ -14137,7 +14137,8 @@ ExprResult Sema::TransformToPotentiallyEvaluated(Expr *E) {
 
 void
 Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
-                                      Decl *LambdaContextDecl, ExpressionEvaluationContextRecord::ExpressionKind ExprContext
+                                      Decl *LambdaContextDecl,
+                                      ExpressionEvaluationContextRecord::ExpressionKind ExprContext,
                                       bool IsDecltype, bool IsUnrefltype) {
   ExprEvalContexts.emplace_back(NewContext, ExprCleanupObjects.size(), Cleanup,
                                 LambdaContextDecl, ExprContext, IsDecltype, IsUnrefltype);
@@ -14148,10 +14149,11 @@ Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
 
 void
 Sema::PushExpressionEvaluationContext(ExpressionEvaluationContext NewContext,
-                                      ReuseLambdaContextDecl_t, ExpressionEvaluationContextRecord::ExpressionKind ExprContext
+                                      ReuseLambdaContextDecl_t,
+                                      ExpressionEvaluationContextRecord::ExpressionKind ExprContext,
                                       bool IsDecltype, bool IsUnrefltype) {
   Decl *ClosureContextDecl = ExprEvalContexts.back().ManglingContextDecl;
-  PushExpressionEvaluationContext(NewContext, ClosureContextDecl, ExprContext
+  PushExpressionEvaluationContext(NewContext, ClosureContextDecl, ExprContext,
                                   IsDecltype, IsUnrefltype);
 }
 

@@ -17,12 +17,14 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclAccessPair.h"
 #include "clang/AST/DeclBase.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/LambdaCapture.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/TemplateBase.h"
+#include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/LLVM.h"
@@ -1667,7 +1669,7 @@ ReflexprExpr::ReflexprExpr(const ReflexprExpr& that)
            that.isValueDependent(),
            that.isInstantiationDependent(),
            that.containsUnexpandedParameterPack()),
-      OpLoc(that.getOperatorLoc()), EndLoc(that.getLocEnd()) {
+      OpLoc(that.getOperatorLoc()), EndLoc(that.getEndLoc()) {
 
   setKind(that.getKind());
   setSeqKind(that.getSeqKind());

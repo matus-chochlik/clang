@@ -4697,8 +4697,8 @@ public:
   SourceLocation getRParenLoc() const { return EndLoc; }
   void setRParenLoc(SourceLocation L) { EndLoc = L; }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return OpLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY { return getRParenLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return OpLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return getRParenLoc(); }
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == ReflexprExprClass;
@@ -4730,8 +4730,8 @@ public:
     return ReflexprExpr::fromMetaobjectId(Context, Value);
   }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return Loc; }
-  SourceLocation getLocEnd() const LLVM_READONLY { return Loc; }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return Loc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return Loc; }
 
   SourceLocation getLocation() const { return Loc; }
   void setLocation(SourceLocation L) { Loc = L; }
@@ -4916,8 +4916,8 @@ public:
   SourceLocation getRParenLoc() const { return EndLoc; }
   void setRParenLoc(SourceLocation L) { EndLoc = L; }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return OpLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY { return getRParenLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return OpLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return getRParenLoc(); }
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == UnaryMetaobjectOpExprClass;
@@ -5005,8 +5005,8 @@ public:
   SourceLocation getRParenLoc() const { return EndLoc; }
   void setRParenLoc(SourceLocation L) { EndLoc = L; }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return OpLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY { return getRParenLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return OpLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return getRParenLoc(); }
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == NaryMetaobjectOpExprClass;

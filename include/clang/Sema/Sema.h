@@ -958,7 +958,7 @@ public:
     /// Whether we are in a decltype expression.
     bool IsDecltype;
 
-    /// \brief Whether we are in an unrefltype expression
+    /// Whether we are in an unrefltype expression
     bool IsUnrefltype;
 
     /// The number of active cleanup objects when we entered
@@ -10890,18 +10890,21 @@ class EnterUnrefltypeEvaluationContext {
 
 public:
   EnterUnrefltypeEvaluationContext(Sema &Actions,
-                                   Sema::ExpressionEvaluationContext NewContext,
-                                   Decl *LambdaContextDecl = nullptr)
+                                   Sema::ExpressionEvaluationContext NewContext,				   
+                                   Decl *LambdaContextDecl = nullptr,
+				   Sema::ExpressionEvaluationContextRecord::ExpressionKind Type = Sema::ExpressionEvaluationContextRecord::EK_Other)
       : Actions(Actions) {
-    Actions.PushExpressionEvaluationContext(NewContext, LambdaContextDecl,
+      Actions.PushExpressionEvaluationContext(NewContext, LambdaContextDecl, Type,
                                             false/*IsDecltype*/, true);
   }
   EnterUnrefltypeEvaluationContext(Sema &Actions,
                                    Sema::ExpressionEvaluationContext NewContext,
-                                   Sema::ReuseLambdaContextDecl_t)
+                                   Sema::ReuseLambdaContextDecl_t,
+				   Sema::ExpressionEvaluationContextRecord::ExpressionKind Type = Sema::ExpressionEvaluationContextRecord::EK_Other)
     : Actions(Actions) {
     Actions.PushExpressionEvaluationContext(NewContext, 
                                             Sema::ReuseLambdaContextDecl,
+					    Type,
                                             false/*IsDecltype*/, true);
   }
 

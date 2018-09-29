@@ -5679,12 +5679,12 @@ Sema::CreateUnaryPtrMetaobjectOpExpr(UnaryMetaobjectOp Oper,
                                              nullptr);
 
     MarkDeclRefReferenced(valDeclRefExpr);
-    if (const FieldDecl* fldDecl = dyn_cast<FieldDecl>(valDecl)) {
+    if (FieldDecl* fldDecl = dyn_cast<FieldDecl>(valDecl)) {
       UnusedPrivateFields.remove(fldDecl);
     }
 
     UnaryOperator* result = new (Context) UnaryOperator(valDeclRefExpr,
-                           UO_AddrOf, valPtrTy, VK_RValue, OK_Ordinary, opLoc);
+                           UO_AddrOf, valPtrTy, VK_RValue, OK_Ordinary, opLoc, false);
     UpdateMarkingForLValueToRValue(result);
     return result;
   }

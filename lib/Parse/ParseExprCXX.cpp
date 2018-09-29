@@ -3409,7 +3409,7 @@ ExprResult Parser::ParseReflexprExpression(bool idOnly) {
       TentativeParsingAction tpa(*this);
       DeclSpec DS(AttrFactory);
       ParseSpecifierQualifierList(DS);
-      Declarator DeclaratorInfo(DS, Declarator::TypeNameContext);
+      Declarator DeclaratorInfo(DS, DeclaratorContext::TypeNameContext);
       ParseDeclarator(DeclaratorInfo);
 
       if(Tok.is(tok::r_paren)) {

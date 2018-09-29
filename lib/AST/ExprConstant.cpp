@@ -7641,7 +7641,7 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
     case BuiltinType::SatULongFract:
       return GCCTypeClass::None;
     case BuiltinType::MetaobjectId:
-      return integer_type_class;
+      return GCCTypeClass::Integer;
 
     case BuiltinType::NullPtr:
 

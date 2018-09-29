@@ -163,7 +163,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
 
   ExprEvalContexts.emplace_back(
       ExpressionEvaluationContext::PotentiallyEvaluated, 0, CleanupInfo{},
-      nullptr, ExpressionEvaluationContextRecord::EK_Other);
+      nullptr, ExpressionEvaluationContextRecord::EK_Other, false);
 
   PreallocatedFunctionScope.reset(new FunctionScopeInfo(Diags));
 
