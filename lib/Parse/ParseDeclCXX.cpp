@@ -1029,14 +1029,14 @@ SourceLocation Parser::ParseUnrefltypeSpecifier(DeclSpec &DS) {
   if (Tok.is(tok::annot___unrefltype)) {
     Result = getExprAnnotation(Tok);
     EndLoc = Tok.getAnnotationEndLoc();
-    ConsumeToken();
+    ConsumeAnyToken();
     if (Result.isInvalid()) {
       DS.SetTypeSpecError();
       return EndLoc;
     }
   } else {
     Token OpTok = Tok;
-    ConsumeToken(); // eat __unrefltype
+    ConsumeAnyToken(); // eat __unrefltype
 
     EnterUnrefltypeEvaluationContext EUTEval(Actions,
 		    Sema::ExpressionEvaluationContext::ConstantEvaluated);
